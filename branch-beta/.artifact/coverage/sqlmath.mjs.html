@@ -263,7 +263,7 @@ body {
 <pre><span class="lineno"><a href="#line_105" id="line_105">  105.</a></span><span class="count        ">      1</span><span>let sqlMessageDict = {}; // dict of web-worker-callbacks</span></pre>
 <pre><span class="lineno"><a href="#line_106" id="line_106">  106.</a></span><span class="count        ">      1</span><span>let sqlMessageId = 0;</span></pre>
 <pre><span class="lineno"><a href="#line_107" id="line_107">  107.</a></span><span class="count        ">      1</span><span>let sqlWorker;</span></pre>
-<pre><span class="lineno"><a href="#line_108" id="line_108">  108.</a></span><span class="count        ">      1</span><span>let version = "v2024.4.1-beta";</span></pre>
+<pre><span class="lineno"><a href="#line_108" id="line_108">  108.</a></span><span class="count        ">      1</span><span>let version = "v2024.5.26";</span></pre>
 <pre><span class="lineno"><a href="#line_109" id="line_109">  109.</a></span><span class="count        ">      1</span><span></span></pre>
 <pre><span class="lineno"><a href="#line_110" id="line_110">  110.</a></span><span class="count        ">     82</span><span>async function assertErrorThrownAsync(asyncFunc, regexp) {</span></pre>
 <pre><span class="lineno"><a href="#line_111" id="line_111">  111.</a></span><span class="count        ">     82</span><span></span></pre>
@@ -282,18 +282,18 @@ body {
 <pre><span class="lineno"><a href="#line_124" id="line_124">  124.</a></span><span class="count        ">     82</span><span>    );</span></pre>
 <pre><span class="lineno"><a href="#line_125" id="line_125">  125.</a></span><span class="count        ">     82</span><span>}</span></pre>
 <pre><span class="lineno"><a href="#line_126" id="line_126">  126.</a></span><span class="count        ">      1</span><span></span></pre>
-<pre><span class="lineno"><a href="#line_127" id="line_127">  127.</a></span><span class="count        ">   5024</span><span>function assertInt64(val) {</span></pre>
-<pre><span class="lineno"><a href="#line_128" id="line_128">  128.</a></span><span class="count        ">   5024</span><span>    // This function will assert &lt;val&gt; is within range of c99-signed-long-long.</span></pre>
-<pre><span class="lineno"><a href="#line_129" id="line_129">  129.</a></span><span class="count        ">   5024</span><span>    val = BigInt(val);</span></pre>
-<pre><span class="lineno"><a href="#line_130" id="line_130">  130.</a></span><span class="count        ">   5024</span><span>    if (!(</span></pre>
-<pre><span class="lineno"><a href="#line_131" id="line_131">  131.</a></span><span class="count        ">   5019</span><span>        -9_223_372_036_854_775_808n &lt;= val &amp;&amp; val &lt;= 9_223_372_036_854_775_807n</span></pre>
+<pre><span class="lineno"><a href="#line_127" id="line_127">  127.</a></span><span class="count        ">   5040</span><span>function assertInt64(val) {</span></pre>
+<pre><span class="lineno"><a href="#line_128" id="line_128">  128.</a></span><span class="count        ">   5040</span><span>    // This function will assert &lt;val&gt; is within range of c99-signed-long-long.</span></pre>
+<pre><span class="lineno"><a href="#line_129" id="line_129">  129.</a></span><span class="count        ">   5040</span><span>    val = BigInt(val);</span></pre>
+<pre><span class="lineno"><a href="#line_130" id="line_130">  130.</a></span><span class="count        ">   5040</span><span>    if (!(</span></pre>
+<pre><span class="lineno"><a href="#line_131" id="line_131">  131.</a></span><span class="count        ">   5035</span><span>        -9_223_372_036_854_775_808n &lt;= val &amp;&amp; val &lt;= 9_223_372_036_854_775_807n</span></pre>
 <pre><span class="lineno"><a href="#line_132" id="line_132">  132.</a></span><span class="count        ">     10</span><span>    )) {</span></pre>
 <pre><span class="lineno"><a href="#line_133" id="line_133">  133.</a></span><span class="count        ">     10</span><span>        throw new Error(</span></pre>
 <pre><span class="lineno"><a href="#line_134" id="line_134">  134.</a></span><span class="count        ">     10</span><span>            `integer ${val} outside signed-64-bit inclusive-range`</span></pre>
 <pre><span class="lineno"><a href="#line_135" id="line_135">  135.</a></span><span class="count        ">     10</span><span>            + " -9,223,372,036,854,775,808 to 9,223,372,036,854,775,807"</span></pre>
 <pre><span class="lineno"><a href="#line_136" id="line_136">  136.</a></span><span class="count        ">     10</span><span>        );</span></pre>
 <pre><span class="lineno"><a href="#line_137" id="line_137">  137.</a></span><span class="count        ">     10</span><span>    }</span></pre>
-<pre><span class="lineno"><a href="#line_138" id="line_138">  138.</a></span><span class="count        ">   5024</span><span>}</span></pre>
+<pre><span class="lineno"><a href="#line_138" id="line_138">  138.</a></span><span class="count        ">   5040</span><span>}</span></pre>
 <pre><span class="lineno"><a href="#line_139" id="line_139">  139.</a></span><span class="count        ">      1</span><span></span></pre>
 <pre><span class="lineno"><a href="#line_140" id="line_140">  140.</a></span><span class="count        ">   2794</span><span>function assertJsonEqual(aa, bb, message) {</span></pre>
 <pre><span class="lineno"><a href="#line_141" id="line_141">  141.</a></span><span class="count        ">   2794</span><span></span></pre>
@@ -331,10 +331,10 @@ body {
 <pre><span class="lineno"><a href="#line_173" id="line_173">  173.</a></span><span class="count        ">      2</span><span>    }</span></pre>
 <pre><span class="lineno"><a href="#line_174" id="line_174">  174.</a></span><span class="count        ">      4</span><span>}</span></pre>
 <pre><span class="lineno"><a href="#line_175" id="line_175">  175.</a></span><span class="count        ">      1</span><span></span></pre>
-<pre><span class="lineno"><a href="#line_176" id="line_176">  176.</a></span><span class="count        ">  16570</span><span>function assertOrThrow(condition, message) {</span></pre>
-<pre><span class="lineno"><a href="#line_177" id="line_177">  177.</a></span><span class="count        ">  16570</span><span></span></pre>
-<pre><span class="lineno"><a href="#line_178" id="line_178">  178.</a></span><span class="count        ">  16570</span><span>// This function will throw &lt;message&gt; if &lt;condition&gt; is falsy.</span></pre>
-<pre><span class="lineno"><a href="#line_179" id="line_179">  179.</a></span><span class="count        ">  16570</span><span></span></pre>
+<pre><span class="lineno"><a href="#line_176" id="line_176">  176.</a></span><span class="count        ">  16606</span><span>function assertOrThrow(condition, message) {</span></pre>
+<pre><span class="lineno"><a href="#line_177" id="line_177">  177.</a></span><span class="count        ">  16606</span><span></span></pre>
+<pre><span class="lineno"><a href="#line_178" id="line_178">  178.</a></span><span class="count        ">  16606</span><span>// This function will throw &lt;message&gt; if &lt;condition&gt; is falsy.</span></pre>
+<pre><span class="lineno"><a href="#line_179" id="line_179">  179.</a></span><span class="count        ">  16606</span><span></span></pre>
 <pre><span class="lineno"><a href="#line_180" id="line_180">  180.</a></span><span class="count        ">     70</span><span>    if (!condition) {</span></pre>
 <pre><span class="lineno"><a href="#line_181" id="line_181">  181.</a></span><span class="count        ">     70</span><span>        throw (</span></pre>
 <pre><span class="lineno"><a href="#line_182" id="line_182">  182.</a></span><span class="count        ">     70</span><span>            (!message || typeof message === "string")</span></pre>
@@ -342,7 +342,7 @@ body {
 <pre><span class="lineno"><a href="#line_184" id="line_184">  184.</a></span><span class="count        ">     70</span><span>            : message</span></pre>
 <pre><span class="lineno"><a href="#line_185" id="line_185">  185.</a></span><span class="count        ">     70</span><span>        );</span></pre>
 <pre><span class="lineno"><a href="#line_186" id="line_186">  186.</a></span><span class="count        ">     70</span><span>    }</span></pre>
-<pre><span class="lineno"><a href="#line_187" id="line_187">  187.</a></span><span class="count        ">  16570</span><span>}</span></pre>
+<pre><span class="lineno"><a href="#line_187" id="line_187">  187.</a></span><span class="count        ">  16606</span><span>}</span></pre>
 <pre><span class="lineno"><a href="#line_188" id="line_188">  188.</a></span><span class="count        ">      1</span><span></span></pre>
 <pre><span class="lineno"><a href="#line_189" id="line_189">  189.</a></span><span class="count        ">     15</span><span>async function childProcessSpawn2(command, args, option) {</span></pre>
 <pre><span class="lineno"><a href="#line_190" id="line_190">  190.</a></span><span class="count        ">     15</span><span></span></pre>
@@ -610,18 +610,18 @@ body {
 <pre><span class="lineno"><a href="#line_452" id="line_452">  452.</a></span><span class="count        ">      7</span><span>    );</span></pre>
 <pre><span class="lineno"><a href="#line_453" id="line_453">  453.</a></span><span class="count        ">      7</span><span>}</span></pre>
 <pre><span class="lineno"><a href="#line_454" id="line_454">  454.</a></span><span class="count        ">      1</span><span></span></pre>
-<pre><span class="lineno"><a href="#line_455" id="line_455">  455.</a></span><span class="count        ">   1369</span><span>async function dbCallAsync(baton, argList, mode) {</span></pre>
-<pre><span class="lineno"><a href="#line_456" id="line_456">  456.</a></span><span class="count        ">   1369</span><span></span></pre>
-<pre><span class="lineno"><a href="#line_457" id="line_457">  457.</a></span><span class="count        ">   1369</span><span>// This function will call c-function dbXxx() with given &lt;funcname&gt;</span></pre>
-<pre><span class="lineno"><a href="#line_458" id="line_458">  458.</a></span><span class="count        ">   1369</span><span>// and return [&lt;baton&gt;, ...argList].</span></pre>
-<pre><span class="lineno"><a href="#line_459" id="line_459">  459.</a></span><span class="count        ">   1369</span><span></span></pre>
-<pre><span class="lineno"><a href="#line_460" id="line_460">  460.</a></span><span class="count        ">   1369</span><span>    let db;</span></pre>
-<pre><span class="lineno"><a href="#line_461" id="line_461">  461.</a></span><span class="count        ">   1369</span><span>    let errStack;</span></pre>
-<pre><span class="lineno"><a href="#line_462" id="line_462">  462.</a></span><span class="count        ">   1369</span><span>    let funcname;</span></pre>
-<pre><span class="lineno"><a href="#line_463" id="line_463">  463.</a></span><span class="count        ">   1369</span><span>    let id;</span></pre>
-<pre><span class="lineno"><a href="#line_464" id="line_464">  464.</a></span><span class="count        ">   1369</span><span>    let result;</span></pre>
-<pre><span class="lineno"><a href="#line_465" id="line_465">  465.</a></span><span class="count        ">   1369</span><span>    let timeElapsed;</span></pre>
-<pre><span class="lineno"><a href="#line_466" id="line_466">  466.</a></span><span class="count        ">   1369</span><span>    // If argList contains &lt;db&gt;, then mark it as busy.</span></pre>
+<pre><span class="lineno"><a href="#line_455" id="line_455">  455.</a></span><span class="count        ">   1371</span><span>async function dbCallAsync(baton, argList, mode) {</span></pre>
+<pre><span class="lineno"><a href="#line_456" id="line_456">  456.</a></span><span class="count        ">   1371</span><span></span></pre>
+<pre><span class="lineno"><a href="#line_457" id="line_457">  457.</a></span><span class="count        ">   1371</span><span>// This function will call c-function dbXxx() with given &lt;funcname&gt;</span></pre>
+<pre><span class="lineno"><a href="#line_458" id="line_458">  458.</a></span><span class="count        ">   1371</span><span>// and return [&lt;baton&gt;, ...argList].</span></pre>
+<pre><span class="lineno"><a href="#line_459" id="line_459">  459.</a></span><span class="count        ">   1371</span><span></span></pre>
+<pre><span class="lineno"><a href="#line_460" id="line_460">  460.</a></span><span class="count        ">   1371</span><span>    let db;</span></pre>
+<pre><span class="lineno"><a href="#line_461" id="line_461">  461.</a></span><span class="count        ">   1371</span><span>    let errStack;</span></pre>
+<pre><span class="lineno"><a href="#line_462" id="line_462">  462.</a></span><span class="count        ">   1371</span><span>    let funcname;</span></pre>
+<pre><span class="lineno"><a href="#line_463" id="line_463">  463.</a></span><span class="count        ">   1371</span><span>    let id;</span></pre>
+<pre><span class="lineno"><a href="#line_464" id="line_464">  464.</a></span><span class="count        ">   1371</span><span>    let result;</span></pre>
+<pre><span class="lineno"><a href="#line_465" id="line_465">  465.</a></span><span class="count        ">   1371</span><span>    let timeElapsed;</span></pre>
+<pre><span class="lineno"><a href="#line_466" id="line_466">  466.</a></span><span class="count        ">   1371</span><span>    // If argList contains &lt;db&gt;, then mark it as busy.</span></pre>
 <pre><span class="lineno"><a href="#line_467" id="line_467">  467.</a></span><span class="count        ">    641</span><span>    if (mode === "modeDb") {</span></pre>
 <pre><span class="lineno"><a href="#line_468" id="line_468">  468.</a></span><span class="count        ">    641</span><span>        // init db</span></pre>
 <pre><span class="lineno"><a href="#line_469" id="line_469">  469.</a></span><span class="count        ">    641</span><span>        db = argList[0];</span></pre>
@@ -643,84 +643,84 @@ body {
 <pre><span class="lineno"><a href="#line_485" id="line_485">  485.</a></span><span class="count        ">    641</span><span>                `dbCallAsync - invalid db.busy = ${db.busy}`</span></pre>
 <pre><span class="lineno"><a href="#line_486" id="line_486">  486.</a></span><span class="count        ">    641</span><span>            );</span></pre>
 <pre><span class="lineno"><a href="#line_487" id="line_487">  487.</a></span><span class="count        ">    641</span><span>        }</span></pre>
-<pre><span class="lineno"><a href="#line_488" id="line_488">  488.</a></span><span class="count        ">    728</span><span>    }</span></pre>
-<pre><span class="lineno"><a href="#line_489" id="line_489">  489.</a></span><span class="count        ">    728</span><span>    // copy argList to avoid side-effect</span></pre>
-<pre><span class="lineno"><a href="#line_490" id="line_490">  490.</a></span><span class="count        ">    728</span><span>    argList = [...argList];</span></pre>
-<pre><span class="lineno"><a href="#line_491" id="line_491">  491.</a></span><span class="count        ">    728</span><span>    assertOrThrow(</span></pre>
-<pre><span class="lineno"><a href="#line_492" id="line_492">  492.</a></span><span class="count        ">    728</span><span>        argList.length &lt;= JSBATON_ARGC,</span></pre>
-<pre><span class="lineno"><a href="#line_493" id="line_493">  493.</a></span><span class="count        ">    728</span><span>        `dbCallAsync - argList.length must be less than than ${JSBATON_ARGC}`</span></pre>
-<pre><span class="lineno"><a href="#line_494" id="line_494">  494.</a></span><span class="count        ">    728</span><span>    );</span></pre>
-<pre><span class="lineno"><a href="#line_495" id="line_495">  495.</a></span><span class="count        ">    728</span><span>    // pad argList to length JSBATON_ARGC</span></pre>
-<pre><span class="lineno"><a href="#line_496" id="line_496">  496.</a></span><span class="count        ">   2355</span><span>    while (argList.length &lt; JSBATON_ARGC) {</span></pre>
-<pre><span class="lineno"><a href="#line_497" id="line_497">  497.</a></span><span class="count        ">   2355</span><span>        argList.push(0n);</span></pre>
-<pre><span class="lineno"><a href="#line_498" id="line_498">  498.</a></span><span class="count        ">   2355</span><span>    }</span></pre>
-<pre><span class="lineno"><a href="#line_499" id="line_499">  499.</a></span><span class="count        ">    728</span><span>    // serialize js-value to c-value</span></pre>
-<pre><span class="lineno"><a href="#line_500" id="line_500">  500.</a></span><span class="count        ">   5686</span><span>    argList = argList.map(function (val, argi) {</span></pre>
-<pre><span class="lineno"><a href="#line_501" id="line_501">  501.</a></span><span class="count        ">   5685</span><span>        if (val === null || val === undefined) {</span></pre>
-<pre><span class="lineno"><a href="#line_502" id="line_502">  502.</a></span><span class="count        ">    728</span><span>            val = 0;</span></pre>
-<pre><span class="lineno"><a href="#line_503" id="line_503">  503.</a></span><span class="count        ">    728</span><span>        }</span></pre>
-<pre><span class="lineno"><a href="#line_504" id="line_504">  504.</a></span><span class="count        ">   5686</span><span>        switch (typeof val) {</span></pre>
-<pre><span class="lineno"><a href="#line_505" id="line_505">  505.</a></span><span class="count        ">   2908</span><span>        case "bigint":</span></pre>
-<pre><span class="lineno"><a href="#line_506" id="line_506">  506.</a></span><span class="count        ">   3549</span><span>        case "boolean":</span></pre>
-<pre><span class="lineno"><a href="#line_507" id="line_507">  507.</a></span><span class="count        ">   5006</span><span>        case "number":</span></pre>
-<pre><span class="lineno"><a href="#line_508" id="line_508">  508.</a></span><span class="count        ">   5006</span><span>            // check for min/max safe-integer</span></pre>
-<pre><span class="lineno"><a href="#line_509" id="line_509">  509.</a></span><span class="count        ">   5006</span><span>            assertOrThrow(</span></pre>
-<pre><span class="lineno"><a href="#line_510" id="line_510">  510.</a></span><span class="count        ">   5006</span><span>                (</span></pre>
-<pre><span class="lineno"><a href="#line_511" id="line_511">  511.</a></span><span class="count        ">   5006</span><span>                    (JS_MIN_SAFE_INTEGER &lt;= val &amp;&amp; val &lt;= JS_MAX_SAFE_INTEGER)</span></pre>
-<pre><span class="lineno"><a href="#line_512" id="line_512">  512.</a></span><span class="count        ">   5006</span><span>                    || typeof val === "bigint"</span></pre>
-<pre><span class="lineno"><a href="#line_513" id="line_513">  513.</a></span><span class="count        ">   5006</span><span>                ),</span></pre>
-<pre><span class="lineno"><a href="#line_514" id="line_514">  514.</a></span><span class="count        ">   5006</span><span>                (</span></pre>
-<pre><span class="lineno"><a href="#line_515" id="line_515">  515.</a></span><span class="count        ">   5006</span><span>                    "dbCallAsync - "</span></pre>
-<pre><span class="lineno"><a href="#line_516" id="line_516">  516.</a></span><span class="count        ">   5006</span><span>                    + "non-bigint-integer must be within inclusive-range"</span></pre>
-<pre><span class="lineno"><a href="#line_517" id="line_517">  517.</a></span><span class="count        ">   5006</span><span>                    + ` ${JS_MIN_SAFE_INTEGER} to ${JS_MAX_SAFE_INTEGER}`</span></pre>
-<pre><span class="lineno"><a href="#line_518" id="line_518">  518.</a></span><span class="count        ">   5006</span><span>                )</span></pre>
-<pre><span class="lineno"><a href="#line_519" id="line_519">  519.</a></span><span class="count        ">   5006</span><span>            );</span></pre>
-<pre><span class="lineno"><a href="#line_520" id="line_520">  520.</a></span><span class="count        ">   5006</span><span>            val = BigInt(val);</span></pre>
-<pre><span class="lineno"><a href="#line_521" id="line_521">  521.</a></span><span class="count        ">   5006</span><span>            assertInt64(val);</span></pre>
-<pre><span class="lineno"><a href="#line_522" id="line_522">  522.</a></span><span class="count        ">   5006</span><span>            baton.setBigInt64(JSBATON_OFFSET_ARGV + argi * 8, val, true);</span></pre>
-<pre><span class="lineno"><a href="#line_523" id="line_523">  523.</a></span><span class="count        ">   5006</span><span>            return val;</span></pre>
-<pre><span class="lineno"><a href="#line_524" id="line_524">  524.</a></span><span class="count        ">   5686</span><span>        // case "object":</span></pre>
-<pre><span class="lineno"><a href="#line_525" id="line_525">  525.</a></span><span class="count        ">   5686</span><span>        //     break;</span></pre>
-<pre><span class="lineno"><a href="#line_526" id="line_526">  526.</a></span><span class="count        ">    728</span><span>        case "string":</span></pre>
-<pre><span class="lineno"><a href="#line_527" id="line_527">  527.</a></span><span class="count        ">    728</span><span>            baton = jsbatonSetValue(baton, argi, (</span></pre>
-<pre><span class="lineno"><a href="#line_528" id="line_528">  528.</a></span><span class="count        ">    728</span><span>                val.endsWith("\u0000")</span></pre>
-<pre><span class="lineno"><a href="#line_529" id="line_529">  529.</a></span><span class="count        ">    728</span><span>                ? val</span></pre>
-<pre><span class="lineno"><a href="#line_530" id="line_530">  530.</a></span><span class="count        ">    728</span><span>                // append null-terminator to string</span></pre>
-<pre><span class="lineno"><a href="#line_531" id="line_531">  531.</a></span><span class="count        ">    728</span><span>                : val + "\u0000"</span></pre>
-<pre><span class="lineno"><a href="#line_532" id="line_532">  532.</a></span><span class="count        ">    728</span><span>            ));</span></pre>
-<pre><span class="lineno"><a href="#line_533" id="line_533">  533.</a></span><span class="count        ">    728</span><span>            return;</span></pre>
-<pre><span class="lineno"><a href="#line_534" id="line_534">  534.</a></span><span class="count        ">    728</span><span>        }</span></pre>
-<pre><span class="lineno"><a href="#line_535" id="line_535">  535.</a></span><span class="count        ">    728</span><span>        assertOrThrow(</span></pre>
-<pre><span class="lineno"><a href="#line_536" id="line_536">  536.</a></span><span class="count        ">    728</span><span>            !ArrayBuffer.isView(val) || val.byteOffset === 0,</span></pre>
-<pre><span class="lineno"><a href="#line_537" id="line_537">  537.</a></span><span class="count        ">   5686</span><span>            (</span></pre>
-<pre><span class="lineno"><a href="#line_538" id="line_538">  538.</a></span><span class="count        ">   5686</span><span>                "dbCallAsync - argList cannot contain arraybuffer-views"</span></pre>
-<pre><span class="lineno"><a href="#line_539" id="line_539">  539.</a></span><span class="count        ">   5686</span><span>                + " with non-zero byteOffset"</span></pre>
-<pre><span class="lineno"><a href="#line_540" id="line_540">  540.</a></span><span class="count        ">   5686</span><span>            )</span></pre>
-<pre><span class="lineno"><a href="#line_541" id="line_541">  541.</a></span><span class="count        ">   5686</span><span>        );</span></pre>
-<pre><span class="lineno"><a href="#line_542" id="line_542">  542.</a></span><span class="count        ">    728</span><span>        if (isExternalBuffer(val)) {</span></pre>
-<pre><span class="lineno"><a href="#line_543" id="line_543">  543.</a></span><span class="count        ">    728</span><span>            return val;</span></pre>
-<pre><span class="lineno"><a href="#line_544" id="line_544">  544.</a></span><span class="count        ">    728</span><span>        }</span></pre>
-<pre><span class="lineno"><a href="#line_545" id="line_545">  545.</a></span><span class="count        ">    728</span><span>        throw new Error(`dbCallAsync - invalid arg-type "${typeof val}"`);</span></pre>
-<pre><span class="lineno"><a href="#line_546" id="line_546">  546.</a></span><span class="count        ">    728</span><span>    });</span></pre>
-<pre><span class="lineno"><a href="#line_547" id="line_547">  547.</a></span><span class="count        ">    728</span><span>    // assert byteOffset === 0</span></pre>
-<pre><span class="lineno"><a href="#line_548" id="line_548">  548.</a></span><span class="count        ">   6345</span><span>    [baton, ...argList].forEach(function (arg) {</span></pre>
-<pre><span class="lineno"><a href="#line_549" id="line_549">  549.</a></span><span class="count        ">    728</span><span>        assertOrThrow(!ArrayBuffer.isView(arg) || arg.byteOffset === 0, arg);</span></pre>
-<pre><span class="lineno"><a href="#line_550" id="line_550">  550.</a></span><span class="count        ">   6345</span><span>    });</span></pre>
-<pre><span class="lineno"><a href="#line_551" id="line_551">  551.</a></span><span class="count        ">    728</span><span>    // extract funcname</span></pre>
-<pre><span class="lineno"><a href="#line_552" id="line_552">  552.</a></span><span class="count        ">    728</span><span>    funcname = new TextDecoder().decode(</span></pre>
-<pre><span class="lineno"><a href="#line_553" id="line_553">  553.</a></span><span class="count        ">    728</span><span>        new DataView(baton.buffer, JSBATON_OFFSET_FUNCNAME, SIZEOF_FUNCNAME)</span></pre>
-<pre><span class="lineno"><a href="#line_554" id="line_554">  554.</a></span><span class="count        ">    728</span><span>    ).replace((/\u0000/g), "");</span></pre>
-<pre><span class="lineno"><a href="#line_555" id="line_555">  555.</a></span><span class="count        ">    728</span><span>    // preserve stack-trace</span></pre>
-<pre><span class="lineno"><a href="#line_556" id="line_556">  556.</a></span><span class="count        ">    728</span><span>    errStack = new Error().stack.replace((/.*$/m), "");</span></pre>
-<pre><span class="lineno"><a href="#line_557" id="line_557">  557.</a></span><span class="count        ">    728</span><span>    try {</span></pre>
-<pre><span class="lineno"><a href="#line_558" id="line_558">  558.</a></span><span class="count        ">    728</span><span></span></pre>
-<pre><span class="lineno"><a href="#line_559" id="line_559">  559.</a></span><span class="count        ">    728</span><span>// Dispatch to nodejs-napi.</span></pre>
-<pre><span class="lineno"><a href="#line_560" id="line_560">  560.</a></span><span class="count        ">    728</span><span></span></pre>
-<pre><span class="lineno"><a href="#line_561" id="line_561">  561.</a></span><span class="count        ">    728</span><span>        if (!IS_BROWSER) {</span></pre>
-<pre><span class="lineno"><a href="#line_562" id="line_562">  562.</a></span><span class="count        ">    703</span><span>            await cModule._jspromiseCreate(baton.buffer, argList, funcname);</span></pre>
-<pre><span class="lineno"><a href="#line_563" id="line_563">  563.</a></span><span class="count        ">    703</span><span>            // prepend baton to argList</span></pre>
-<pre><span class="lineno"><a href="#line_564" id="line_564">  564.</a></span><span class="count        ">    703</span><span>            return [baton, ...argList];</span></pre>
-<pre><span class="lineno"><a href="#line_565" id="line_565">  565.</a></span><span class="count        ">    703</span><span>        }</span></pre>
+<pre><span class="lineno"><a href="#line_488" id="line_488">  488.</a></span><span class="count        ">    730</span><span>    }</span></pre>
+<pre><span class="lineno"><a href="#line_489" id="line_489">  489.</a></span><span class="count        ">    730</span><span>    // copy argList to avoid side-effect</span></pre>
+<pre><span class="lineno"><a href="#line_490" id="line_490">  490.</a></span><span class="count        ">    730</span><span>    argList = [...argList];</span></pre>
+<pre><span class="lineno"><a href="#line_491" id="line_491">  491.</a></span><span class="count        ">    730</span><span>    assertOrThrow(</span></pre>
+<pre><span class="lineno"><a href="#line_492" id="line_492">  492.</a></span><span class="count        ">    730</span><span>        argList.length &lt;= JSBATON_ARGC,</span></pre>
+<pre><span class="lineno"><a href="#line_493" id="line_493">  493.</a></span><span class="count        ">    730</span><span>        `dbCallAsync - argList.length must be less than than ${JSBATON_ARGC}`</span></pre>
+<pre><span class="lineno"><a href="#line_494" id="line_494">  494.</a></span><span class="count        ">    730</span><span>    );</span></pre>
+<pre><span class="lineno"><a href="#line_495" id="line_495">  495.</a></span><span class="count        ">    730</span><span>    // pad argList to length JSBATON_ARGC</span></pre>
+<pre><span class="lineno"><a href="#line_496" id="line_496">  496.</a></span><span class="count        ">   2369</span><span>    while (argList.length &lt; JSBATON_ARGC) {</span></pre>
+<pre><span class="lineno"><a href="#line_497" id="line_497">  497.</a></span><span class="count        ">   2369</span><span>        argList.push(0n);</span></pre>
+<pre><span class="lineno"><a href="#line_498" id="line_498">  498.</a></span><span class="count        ">   2369</span><span>    }</span></pre>
+<pre><span class="lineno"><a href="#line_499" id="line_499">  499.</a></span><span class="count        ">    730</span><span>    // serialize js-value to c-value</span></pre>
+<pre><span class="lineno"><a href="#line_500" id="line_500">  500.</a></span><span class="count        ">   5702</span><span>    argList = argList.map(function (val, argi) {</span></pre>
+<pre><span class="lineno"><a href="#line_501" id="line_501">  501.</a></span><span class="count        ">   5701</span><span>        if (val === null || val === undefined) {</span></pre>
+<pre><span class="lineno"><a href="#line_502" id="line_502">  502.</a></span><span class="count        ">    730</span><span>            val = 0;</span></pre>
+<pre><span class="lineno"><a href="#line_503" id="line_503">  503.</a></span><span class="count        ">    730</span><span>        }</span></pre>
+<pre><span class="lineno"><a href="#line_504" id="line_504">  504.</a></span><span class="count        ">   5702</span><span>        switch (typeof val) {</span></pre>
+<pre><span class="lineno"><a href="#line_505" id="line_505">  505.</a></span><span class="count        ">   2924</span><span>        case "bigint":</span></pre>
+<pre><span class="lineno"><a href="#line_506" id="line_506">  506.</a></span><span class="count        ">   3565</span><span>        case "boolean":</span></pre>
+<pre><span class="lineno"><a href="#line_507" id="line_507">  507.</a></span><span class="count        ">   5022</span><span>        case "number":</span></pre>
+<pre><span class="lineno"><a href="#line_508" id="line_508">  508.</a></span><span class="count        ">   5022</span><span>            // check for min/max safe-integer</span></pre>
+<pre><span class="lineno"><a href="#line_509" id="line_509">  509.</a></span><span class="count        ">   5022</span><span>            assertOrThrow(</span></pre>
+<pre><span class="lineno"><a href="#line_510" id="line_510">  510.</a></span><span class="count        ">   5022</span><span>                (</span></pre>
+<pre><span class="lineno"><a href="#line_511" id="line_511">  511.</a></span><span class="count        ">   5022</span><span>                    (JS_MIN_SAFE_INTEGER &lt;= val &amp;&amp; val &lt;= JS_MAX_SAFE_INTEGER)</span></pre>
+<pre><span class="lineno"><a href="#line_512" id="line_512">  512.</a></span><span class="count        ">   5022</span><span>                    || typeof val === "bigint"</span></pre>
+<pre><span class="lineno"><a href="#line_513" id="line_513">  513.</a></span><span class="count        ">   5022</span><span>                ),</span></pre>
+<pre><span class="lineno"><a href="#line_514" id="line_514">  514.</a></span><span class="count        ">   5022</span><span>                (</span></pre>
+<pre><span class="lineno"><a href="#line_515" id="line_515">  515.</a></span><span class="count        ">   5022</span><span>                    "dbCallAsync - "</span></pre>
+<pre><span class="lineno"><a href="#line_516" id="line_516">  516.</a></span><span class="count        ">   5022</span><span>                    + "non-bigint-integer must be within inclusive-range"</span></pre>
+<pre><span class="lineno"><a href="#line_517" id="line_517">  517.</a></span><span class="count        ">   5022</span><span>                    + ` ${JS_MIN_SAFE_INTEGER} to ${JS_MAX_SAFE_INTEGER}`</span></pre>
+<pre><span class="lineno"><a href="#line_518" id="line_518">  518.</a></span><span class="count        ">   5022</span><span>                )</span></pre>
+<pre><span class="lineno"><a href="#line_519" id="line_519">  519.</a></span><span class="count        ">   5022</span><span>            );</span></pre>
+<pre><span class="lineno"><a href="#line_520" id="line_520">  520.</a></span><span class="count        ">   5022</span><span>            val = BigInt(val);</span></pre>
+<pre><span class="lineno"><a href="#line_521" id="line_521">  521.</a></span><span class="count        ">   5022</span><span>            assertInt64(val);</span></pre>
+<pre><span class="lineno"><a href="#line_522" id="line_522">  522.</a></span><span class="count        ">   5022</span><span>            baton.setBigInt64(JSBATON_OFFSET_ARGV + argi * 8, val, true);</span></pre>
+<pre><span class="lineno"><a href="#line_523" id="line_523">  523.</a></span><span class="count        ">   5022</span><span>            return val;</span></pre>
+<pre><span class="lineno"><a href="#line_524" id="line_524">  524.</a></span><span class="count        ">   5702</span><span>        // case "object":</span></pre>
+<pre><span class="lineno"><a href="#line_525" id="line_525">  525.</a></span><span class="count        ">   5702</span><span>        //     break;</span></pre>
+<pre><span class="lineno"><a href="#line_526" id="line_526">  526.</a></span><span class="count        ">    730</span><span>        case "string":</span></pre>
+<pre><span class="lineno"><a href="#line_527" id="line_527">  527.</a></span><span class="count        ">    730</span><span>            baton = jsbatonSetValue(baton, argi, (</span></pre>
+<pre><span class="lineno"><a href="#line_528" id="line_528">  528.</a></span><span class="count        ">    730</span><span>                val.endsWith("\u0000")</span></pre>
+<pre><span class="lineno"><a href="#line_529" id="line_529">  529.</a></span><span class="count        ">    730</span><span>                ? val</span></pre>
+<pre><span class="lineno"><a href="#line_530" id="line_530">  530.</a></span><span class="count        ">    730</span><span>                // append null-terminator to string</span></pre>
+<pre><span class="lineno"><a href="#line_531" id="line_531">  531.</a></span><span class="count        ">    730</span><span>                : val + "\u0000"</span></pre>
+<pre><span class="lineno"><a href="#line_532" id="line_532">  532.</a></span><span class="count        ">    730</span><span>            ));</span></pre>
+<pre><span class="lineno"><a href="#line_533" id="line_533">  533.</a></span><span class="count        ">    730</span><span>            return;</span></pre>
+<pre><span class="lineno"><a href="#line_534" id="line_534">  534.</a></span><span class="count        ">    730</span><span>        }</span></pre>
+<pre><span class="lineno"><a href="#line_535" id="line_535">  535.</a></span><span class="count        ">    730</span><span>        assertOrThrow(</span></pre>
+<pre><span class="lineno"><a href="#line_536" id="line_536">  536.</a></span><span class="count        ">    730</span><span>            !ArrayBuffer.isView(val) || val.byteOffset === 0,</span></pre>
+<pre><span class="lineno"><a href="#line_537" id="line_537">  537.</a></span><span class="count        ">   5702</span><span>            (</span></pre>
+<pre><span class="lineno"><a href="#line_538" id="line_538">  538.</a></span><span class="count        ">   5702</span><span>                "dbCallAsync - argList cannot contain arraybuffer-views"</span></pre>
+<pre><span class="lineno"><a href="#line_539" id="line_539">  539.</a></span><span class="count        ">   5702</span><span>                + " with non-zero byteOffset"</span></pre>
+<pre><span class="lineno"><a href="#line_540" id="line_540">  540.</a></span><span class="count        ">   5702</span><span>            )</span></pre>
+<pre><span class="lineno"><a href="#line_541" id="line_541">  541.</a></span><span class="count        ">   5702</span><span>        );</span></pre>
+<pre><span class="lineno"><a href="#line_542" id="line_542">  542.</a></span><span class="count        ">    730</span><span>        if (isExternalBuffer(val)) {</span></pre>
+<pre><span class="lineno"><a href="#line_543" id="line_543">  543.</a></span><span class="count        ">    730</span><span>            return val;</span></pre>
+<pre><span class="lineno"><a href="#line_544" id="line_544">  544.</a></span><span class="count        ">    730</span><span>        }</span></pre>
+<pre><span class="lineno"><a href="#line_545" id="line_545">  545.</a></span><span class="count        ">    730</span><span>        throw new Error(`dbCallAsync - invalid arg-type "${typeof val}"`);</span></pre>
+<pre><span class="lineno"><a href="#line_546" id="line_546">  546.</a></span><span class="count        ">    730</span><span>    });</span></pre>
+<pre><span class="lineno"><a href="#line_547" id="line_547">  547.</a></span><span class="count        ">    730</span><span>    // assert byteOffset === 0</span></pre>
+<pre><span class="lineno"><a href="#line_548" id="line_548">  548.</a></span><span class="count        ">   6363</span><span>    [baton, ...argList].forEach(function (arg) {</span></pre>
+<pre><span class="lineno"><a href="#line_549" id="line_549">  549.</a></span><span class="count        ">    730</span><span>        assertOrThrow(!ArrayBuffer.isView(arg) || arg.byteOffset === 0, arg);</span></pre>
+<pre><span class="lineno"><a href="#line_550" id="line_550">  550.</a></span><span class="count        ">   6363</span><span>    });</span></pre>
+<pre><span class="lineno"><a href="#line_551" id="line_551">  551.</a></span><span class="count        ">    730</span><span>    // extract funcname</span></pre>
+<pre><span class="lineno"><a href="#line_552" id="line_552">  552.</a></span><span class="count        ">    730</span><span>    funcname = new TextDecoder().decode(</span></pre>
+<pre><span class="lineno"><a href="#line_553" id="line_553">  553.</a></span><span class="count        ">    730</span><span>        new DataView(baton.buffer, JSBATON_OFFSET_FUNCNAME, SIZEOF_FUNCNAME)</span></pre>
+<pre><span class="lineno"><a href="#line_554" id="line_554">  554.</a></span><span class="count        ">    730</span><span>    ).replace((/\u0000/g), "");</span></pre>
+<pre><span class="lineno"><a href="#line_555" id="line_555">  555.</a></span><span class="count        ">    730</span><span>    // preserve stack-trace</span></pre>
+<pre><span class="lineno"><a href="#line_556" id="line_556">  556.</a></span><span class="count        ">    730</span><span>    errStack = new Error().stack.replace((/.*$/m), "");</span></pre>
+<pre><span class="lineno"><a href="#line_557" id="line_557">  557.</a></span><span class="count        ">    730</span><span>    try {</span></pre>
+<pre><span class="lineno"><a href="#line_558" id="line_558">  558.</a></span><span class="count        ">    730</span><span></span></pre>
+<pre><span class="lineno"><a href="#line_559" id="line_559">  559.</a></span><span class="count        ">    730</span><span>// Dispatch to nodejs-napi.</span></pre>
+<pre><span class="lineno"><a href="#line_560" id="line_560">  560.</a></span><span class="count        ">    730</span><span></span></pre>
+<pre><span class="lineno"><a href="#line_561" id="line_561">  561.</a></span><span class="count        ">    730</span><span>        if (!IS_BROWSER) {</span></pre>
+<pre><span class="lineno"><a href="#line_562" id="line_562">  562.</a></span><span class="count        ">    705</span><span>            await cModule._jspromiseCreate(baton.buffer, argList, funcname);</span></pre>
+<pre><span class="lineno"><a href="#line_563" id="line_563">  563.</a></span><span class="count        ">    705</span><span>            // prepend baton to argList</span></pre>
+<pre><span class="lineno"><a href="#line_564" id="line_564">  564.</a></span><span class="count        ">    705</span><span>            return [baton, ...argList];</span></pre>
+<pre><span class="lineno"><a href="#line_565" id="line_565">  565.</a></span><span class="count        ">    705</span><span>        }</span></pre>
 <pre><span class="lineno"><a href="#line_566" id="line_566">  566.</a></span><span class="count        ">      2</span><span></span></pre>
 <pre><span class="lineno"><a href="#line_567" id="line_567">  567.</a></span><span class="count        ">      2</span><span>// Dispatch to web-worker.</span></pre>
 <pre><span class="lineno"><a href="#line_568" id="line_568">  568.</a></span><span class="count        ">      2</span><span></span></pre>
@@ -765,7 +765,7 @@ body {
 <pre><span class="lineno"><a href="#line_607" id="line_607">  607.</a></span><span class="count        ">     53</span><span>        err.stack += errStack;</span></pre>
 <pre><span class="lineno"><a href="#line_608" id="line_608">  608.</a></span><span class="count        ">     53</span><span>        assertOrThrow(undefined, err);</span></pre>
 <pre><span class="lineno"><a href="#line_609" id="line_609">  609.</a></span><span class="count        ">     53</span><span>    }</span></pre>
-<pre><span class="lineno"><a href="#line_610" id="line_610">  610.</a></span><span class="count        ">   1369</span><span>}</span></pre>
+<pre><span class="lineno"><a href="#line_610" id="line_610">  610.</a></span><span class="count        ">   1371</span><span>}</span></pre>
 <pre><span class="lineno"><a href="#line_611" id="line_611">  611.</a></span><span class="count        ">      1</span><span></span></pre>
 <pre><span class="lineno"><a href="#line_612" id="line_612">  612.</a></span><span class="count        ">      3</span><span>async function dbCloseAsync(db) {</span></pre>
 <pre><span class="lineno"><a href="#line_613" id="line_613">  613.</a></span><span class="count        ">      3</span><span></span></pre>
@@ -1236,21 +1236,21 @@ body {
 <pre><span class="lineno"><a href="#line_1078" id="line_1078"> 1078.</a></span><span class="count        ">     17</span><span>    return buf &amp;&amp; buf.constructor === ArrayBuffer;</span></pre>
 <pre><span class="lineno"><a href="#line_1079" id="line_1079"> 1079.</a></span><span class="count        ">     31</span><span>}</span></pre>
 <pre><span class="lineno"><a href="#line_1080" id="line_1080"> 1080.</a></span><span class="count        ">      1</span><span></span></pre>
-<pre><span class="lineno"><a href="#line_1081" id="line_1081"> 1081.</a></span><span class="count        ">    736</span><span>function jsbatonCreate(funcname) {</span></pre>
-<pre><span class="lineno"><a href="#line_1082" id="line_1082"> 1082.</a></span><span class="count        ">    736</span><span></span></pre>
-<pre><span class="lineno"><a href="#line_1083" id="line_1083"> 1083.</a></span><span class="count        ">    736</span><span>// This function will create buffer &lt;baton&gt;.</span></pre>
-<pre><span class="lineno"><a href="#line_1084" id="line_1084"> 1084.</a></span><span class="count        ">    736</span><span></span></pre>
-<pre><span class="lineno"><a href="#line_1085" id="line_1085"> 1085.</a></span><span class="count        ">    736</span><span>    let baton = new DataView(new ArrayBuffer(JSBATON_OFFSET_ALL));</span></pre>
-<pre><span class="lineno"><a href="#line_1086" id="line_1086"> 1086.</a></span><span class="count        ">    736</span><span>    // init nallc, nused</span></pre>
-<pre><span class="lineno"><a href="#line_1087" id="line_1087"> 1087.</a></span><span class="count        ">    736</span><span>    baton.setInt32(4, JSBATON_OFFSET_ALL, true);</span></pre>
-<pre><span class="lineno"><a href="#line_1088" id="line_1088"> 1088.</a></span><span class="count        ">    736</span><span>    // copy funcname into baton</span></pre>
-<pre><span class="lineno"><a href="#line_1089" id="line_1089"> 1089.</a></span><span class="count        ">    736</span><span>    new Uint8Array(</span></pre>
-<pre><span class="lineno"><a href="#line_1090" id="line_1090"> 1090.</a></span><span class="count        ">    736</span><span>        baton.buffer,</span></pre>
-<pre><span class="lineno"><a href="#line_1091" id="line_1091"> 1091.</a></span><span class="count        ">    736</span><span>        baton.byteOffset + JSBATON_OFFSET_FUNCNAME,</span></pre>
-<pre><span class="lineno"><a href="#line_1092" id="line_1092"> 1092.</a></span><span class="count        ">    736</span><span>        SIZEOF_FUNCNAME - 1</span></pre>
-<pre><span class="lineno"><a href="#line_1093" id="line_1093"> 1093.</a></span><span class="count        ">    736</span><span>    ).set(new TextEncoder().encode(funcname));</span></pre>
-<pre><span class="lineno"><a href="#line_1094" id="line_1094"> 1094.</a></span><span class="count        ">    736</span><span>    return baton;</span></pre>
-<pre><span class="lineno"><a href="#line_1095" id="line_1095"> 1095.</a></span><span class="count        ">    736</span><span>}</span></pre>
+<pre><span class="lineno"><a href="#line_1081" id="line_1081"> 1081.</a></span><span class="count        ">    738</span><span>function jsbatonCreate(funcname) {</span></pre>
+<pre><span class="lineno"><a href="#line_1082" id="line_1082"> 1082.</a></span><span class="count        ">    738</span><span></span></pre>
+<pre><span class="lineno"><a href="#line_1083" id="line_1083"> 1083.</a></span><span class="count        ">    738</span><span>// This function will create buffer &lt;baton&gt;.</span></pre>
+<pre><span class="lineno"><a href="#line_1084" id="line_1084"> 1084.</a></span><span class="count        ">    738</span><span></span></pre>
+<pre><span class="lineno"><a href="#line_1085" id="line_1085"> 1085.</a></span><span class="count        ">    738</span><span>    let baton = new DataView(new ArrayBuffer(JSBATON_OFFSET_ALL));</span></pre>
+<pre><span class="lineno"><a href="#line_1086" id="line_1086"> 1086.</a></span><span class="count        ">    738</span><span>    // init nallc, nused</span></pre>
+<pre><span class="lineno"><a href="#line_1087" id="line_1087"> 1087.</a></span><span class="count        ">    738</span><span>    baton.setInt32(4, JSBATON_OFFSET_ALL, true);</span></pre>
+<pre><span class="lineno"><a href="#line_1088" id="line_1088"> 1088.</a></span><span class="count        ">    738</span><span>    // copy funcname into baton</span></pre>
+<pre><span class="lineno"><a href="#line_1089" id="line_1089"> 1089.</a></span><span class="count        ">    738</span><span>    new Uint8Array(</span></pre>
+<pre><span class="lineno"><a href="#line_1090" id="line_1090"> 1090.</a></span><span class="count        ">    738</span><span>        baton.buffer,</span></pre>
+<pre><span class="lineno"><a href="#line_1091" id="line_1091"> 1091.</a></span><span class="count        ">    738</span><span>        baton.byteOffset + JSBATON_OFFSET_FUNCNAME,</span></pre>
+<pre><span class="lineno"><a href="#line_1092" id="line_1092"> 1092.</a></span><span class="count        ">    738</span><span>        SIZEOF_FUNCNAME - 1</span></pre>
+<pre><span class="lineno"><a href="#line_1093" id="line_1093"> 1093.</a></span><span class="count        ">    738</span><span>    ).set(new TextEncoder().encode(funcname));</span></pre>
+<pre><span class="lineno"><a href="#line_1094" id="line_1094"> 1094.</a></span><span class="count        ">    738</span><span>    return baton;</span></pre>
+<pre><span class="lineno"><a href="#line_1095" id="line_1095"> 1095.</a></span><span class="count        ">    738</span><span>}</span></pre>
 <pre><span class="lineno"><a href="#line_1096" id="line_1096"> 1096.</a></span><span class="count        ">      1</span><span></span></pre>
 <pre><span class="lineno"><a href="#line_1097" id="line_1097"> 1097.</a></span><span class="count        ">     24</span><span>function jsbatonGetInt64(baton, argi) {</span></pre>
 <pre><span class="lineno"><a href="#line_1098" id="line_1098"> 1098.</a></span><span class="count        ">     24</span><span></span></pre>
@@ -1738,16 +1738,16 @@ body {
 <pre><span class="lineno"><a href="#line_1580" id="line_1580"> 1580.</a></span><span class="count        ">      3</span><span>    let moduleModule;</span></pre>
 <pre><span class="lineno"><a href="#line_1581" id="line_1581"> 1581.</a></span><span class="count        ">      3</span><span>    dbFinalizationRegistry = (</span></pre>
 <pre><span class="lineno"><a href="#line_1582" id="line_1582"> 1582.</a></span><span class="count        ">      3</span><span>        dbFinalizationRegistry</span></pre>
-<pre><span class="lineno"><a href="#line_1583" id="line_1583"> 1583.</a></span><span class="count        ">     14</span><span>    ) || new FinalizationRegistry(function ({afterFinalization, ptr}) {</span></pre>
-<pre><span class="lineno"><a href="#line_1584" id="line_1584"> 1584.</a></span><span class="count        ">     14</span><span></span></pre>
-<pre><span class="lineno"><a href="#line_1585" id="line_1585"> 1585.</a></span><span class="count        ">     14</span><span>// This function will auto-close any open sqlite3-db-pointer,</span></pre>
-<pre><span class="lineno"><a href="#line_1586" id="line_1586"> 1586.</a></span><span class="count        ">     14</span><span>// after its js-wrapper has been garbage-collected.</span></pre>
-<pre><span class="lineno"><a href="#line_1587" id="line_1587"> 1587.</a></span><span class="count        ">     14</span><span></span></pre>
-<pre><span class="lineno"><a href="#line_1588" id="line_1588"> 1588.</a></span><span class="count        ">     14</span><span>        dbCallAsync(jsbatonCreate("_dbClose"), [ptr[0]]);</span></pre>
+<pre><span class="lineno"><a href="#line_1583" id="line_1583"> 1583.</a></span><span class="count        ">     16</span><span>    ) || new FinalizationRegistry(function ({afterFinalization, ptr}) {</span></pre>
+<pre><span class="lineno"><a href="#line_1584" id="line_1584"> 1584.</a></span><span class="count        ">     16</span><span></span></pre>
+<pre><span class="lineno"><a href="#line_1585" id="line_1585"> 1585.</a></span><span class="count        ">     16</span><span>// This function will auto-close any open sqlite3-db-pointer,</span></pre>
+<pre><span class="lineno"><a href="#line_1586" id="line_1586"> 1586.</a></span><span class="count        ">     16</span><span>// after its js-wrapper has been garbage-collected.</span></pre>
+<pre><span class="lineno"><a href="#line_1587" id="line_1587"> 1587.</a></span><span class="count        ">     16</span><span></span></pre>
+<pre><span class="lineno"><a href="#line_1588" id="line_1588"> 1588.</a></span><span class="count        ">     16</span><span>        dbCallAsync(jsbatonCreate("_dbClose"), [ptr[0]]);</span></pre>
 <pre><span class="lineno"><a href="#line_1589" id="line_1589"> 1589.</a></span><span class="count        ">      1</span><span>        if (afterFinalization) {</span></pre>
 <pre><span class="lineno"><a href="#line_1590" id="line_1590"> 1590.</a></span><span class="count        ">      1</span><span>            afterFinalization();</span></pre>
 <pre><span class="lineno"><a href="#line_1591" id="line_1591"> 1591.</a></span><span class="count        ">      1</span><span>        }</span></pre>
-<pre><span class="lineno"><a href="#line_1592" id="line_1592"> 1592.</a></span><span class="count        ">     14</span><span>    });</span></pre>
+<pre><span class="lineno"><a href="#line_1592" id="line_1592"> 1592.</a></span><span class="count        ">     16</span><span>    });</span></pre>
 <pre><span class="lineno"><a href="#line_1593" id="line_1593"> 1593.</a></span><span class="count        ">      3</span><span></span></pre>
 <pre><span class="lineno"><a href="#line_1594" id="line_1594"> 1594.</a></span><span class="count        ">      3</span><span>// Feature-detect nodejs.</span></pre>
 <pre><span class="lineno"><a href="#line_1595" id="line_1595"> 1595.</a></span><span class="count        ">      3</span><span></span></pre>
