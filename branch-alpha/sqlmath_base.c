@@ -39,6 +39,14 @@ file sqlmath_h - start
 #       define SQLMATH_BASE_C2
 #   endif
 #endif
+#ifdef _WIN32
+#   include <windows.h>
+#else
+#   include <dlfcn.h>
+#endif
+#ifdef SQLMATH_BASE_C2
+#   include "sqlmath_base.h"
+#endif
 
 
 #include <assert.h>
@@ -85,6 +93,7 @@ file sqlmath_h - start
 #define SQLITE_DATATYPE_TEXT            0x03
 #define SQLITE_DATATYPE_TEXT_0          0x13
 #define SQLITE_RESPONSETYPE_LASTBLOB    1
+#define SQLITE_RESPONSETYPE_LASTVALUE   2
 
 
 #define SQLITE_ERROR_DATATYPE_INVALID   0x10003
@@ -128,6 +137,20 @@ file sqlmath_h - start
     if (jsbatonAssertOk(baton, db, errcode)) { \
         goto catch_error; \
     }
+
+#define LGBM_ASSERT_OK() \
+    if (errcode != 0) { \
+        sqlite3_result_error(context, LGBM_GetLastError(), -1); \
+        return; \
+    }
+
+#ifdef _WIN32
+#define LGBM_IMPORT_FUNCTION(func) \
+        func = (func##_t) GetProcAddress(hModule, #func);
+#else
+#define LGBM_IMPORT_FUNCTION(func) \
+        func = (func##_t) dlsym(hModule, #func);
+#endif
 
 // This function will if <cond> is falsy, terminate process with <msg>.
 #define NAPI_ASSERT_FATAL(cond, msg) \
@@ -421,6 +444,12 @@ SQLMATH_API void sqlite3_result_double_or_null(
     const double xx
 );
 
+SQLMATH_API void sqlite3_result_error2(
+    sqlite3_context * context,
+    const char *template,
+    ...                         // NOLINT
+);
+
 SQLMATH_API double sqlite3_value_double_or_nan(
     sqlite3_value * arg
 );
@@ -495,6 +524,53 @@ typedef struct DbExecBindElem {
     char datatype;
 } DbExecBindElem;
 
+static inline void dbExecStr99AppendValue(
+    sqlite3_str * str99,
+    sqlite3_stmt * pStmt,
+    int ii
+) {
+// This function will append json-value to <str99> from <pStmt> at column <ii>.
+    double valDouble = 0;
+    int64_t valInt64 = 0;
+    switch (sqlite3_column_type(pStmt, ii)) {
+    case SQLITE_INTEGER:
+        valInt64 = sqlite3_column_int64(pStmt, ii);
+        if (JS_MIN_SAFE_INTEGER <= valInt64
+            // convert integer to double
+            && valInt64 <= JS_MAX_SAFE_INTEGER) {
+            sqlite3_str_append(str99,
+                (char *) sqlite3_column_text(pStmt, ii),
+                sqlite3_column_bytes(pStmt, ii));
+        } else {
+            // convert integer to string
+            str99JsonAppendText(str99,
+                (char *) sqlite3_column_text(pStmt, ii),
+                sqlite3_column_bytes(pStmt, ii));
+        }
+        break;
+    case SQLITE_FLOAT:
+        valDouble = sqlite3_column_double(pStmt, ii);
+        if (!isfinite(valDouble)) {
+            sqlite3_str_append(str99, "null", 4);
+        } else {
+            sqlite3_str_append(str99,
+                (char *) sqlite3_column_text(pStmt, ii),
+                sqlite3_column_bytes(pStmt, ii));
+        }
+        break;
+    case SQLITE_TEXT:
+        // append text as json-escaped string
+        str99JsonAppendText(str99,
+            (char *) sqlite3_column_text(pStmt, ii),
+            sqlite3_column_bytes(pStmt, ii));
+        break;
+        // case SQLITE_BLOB:
+    default:                   /* case SQLITE_NULL: */
+        sqlite3_str_append(str99, "null", 4);
+        break;
+    }
+}
+
 SQLMATH_API void dbExec(
     Jsbaton * baton
 ) {
@@ -503,10 +579,9 @@ SQLMATH_API void dbExec(
     // declare var
     DbExecBindElem *bindElem = NULL;
     DbExecBindElem *bindList = NULL;
-    const char *zBind = (const char *) baton + JSBATON_OFFSET_ALL;
+    const char *zBind = (char *) baton + JSBATON_OFFSET_ALL;
     const char *zSql = jsbatonGetString(baton, 1);
     const char *zTmp = NULL;
-    double rTmp = 0;
     int bindByKey = (int) baton->argv[3];
     int bindIdx = 0;
     int bindListLength = (int) baton->argv[2];
@@ -515,7 +590,6 @@ SQLMATH_API void dbExec(
     int jj = 0;
     int nCol = 0;
     int responseType = (int) baton->argv[4];
-    int64_t iTmp = 0;
     sqlite3 *db = (sqlite3 *) baton->argv[0];
     sqlite3_stmt *pStmt = NULL; /* The current SQL statement */
     static const char bindPrefix[] = "$:@";
@@ -561,8 +635,7 @@ SQLMATH_API void dbExec(
             break;
         case SQLITE_DATATYPE_EXTERNALBUFFER:
             bindElem->buflen = baton->bufv[*(int32_t *) zBind].len;
-            bindElem->buf =
-                (const char *) baton->bufv[*(int32_t *) zBind].buf;
+            bindElem->buf = (char *) baton->bufv[*(int32_t *) zBind].buf;
             zBind += 4;
             break;
         case SQLITE_DATATYPE_FLOAT:
@@ -587,6 +660,7 @@ SQLMATH_API void dbExec(
     // bracket database [
     switch (responseType) {
     case SQLITE_RESPONSETYPE_LASTBLOB:
+    case SQLITE_RESPONSETYPE_LASTVALUE:
         break;
     default:
         sqlite3_str_appendchar(str99, 1, '[');
@@ -697,8 +771,16 @@ SQLMATH_API void dbExec(
                 }
                 sqlite3_str_reset(str99);
                 sqlite3_str_append(str99,
-                    (const char *) sqlite3_column_blob(pStmt, nCol - 1),
+                    (char *) sqlite3_column_blob(pStmt, nCol - 1),
                     sqlite3_column_bytes(pStmt, nCol - 1));
+                break;
+            case SQLITE_RESPONSETYPE_LASTVALUE:
+                // export last-value as json-value
+                if (nCol == -1) {
+                    nCol = sqlite3_column_count(pStmt);
+                }
+                sqlite3_str_reset(str99);
+                dbExecStr99AppendValue(str99, pStmt, nCol - 1);
                 break;
             default:
                 // insert row of column-names
@@ -737,43 +819,7 @@ SQLMATH_API void dbExec(
                     if (ii > 0) {
                         sqlite3_str_appendchar(str99, 1, ',');
                     }
-                    switch (sqlite3_column_type(pStmt, ii)) {
-                    case SQLITE_INTEGER:
-                        iTmp = sqlite3_column_int64(pStmt, ii);
-                        if (JS_MIN_SAFE_INTEGER <= iTmp
-                            // convert integer to double
-                            && iTmp <= JS_MAX_SAFE_INTEGER) {
-                            sqlite3_str_append(str99,
-                                (const char *) sqlite3_column_text(pStmt, ii),
-                                sqlite3_column_bytes(pStmt, ii));
-                        } else {
-                            // convert integer to string
-                            str99JsonAppendText(str99,
-                                (const char *) sqlite3_column_text(pStmt, ii),
-                                sqlite3_column_bytes(pStmt, ii));
-                        }
-                        break;
-                    case SQLITE_FLOAT:
-                        rTmp = sqlite3_column_double(pStmt, ii);
-                        if (!isfinite(rTmp)) {
-                            sqlite3_str_append(str99, "null", 4);
-                        } else {
-                            sqlite3_str_append(str99,
-                                (const char *) sqlite3_column_text(pStmt, ii),
-                                sqlite3_column_bytes(pStmt, ii));
-                        }
-                        break;
-                    case SQLITE_TEXT:
-                        // append text as json-escaped string
-                        str99JsonAppendText(str99,
-                            (const char *) sqlite3_column_text(pStmt, ii),
-                            sqlite3_column_bytes(pStmt, ii));
-                        break;
-                        // case SQLITE_BLOB:
-                    default:   /* case SQLITE_NULL: */
-                        sqlite3_str_append(str99, "null", 4);
-                        break;
-                    }
+                    dbExecStr99AppendValue(str99, pStmt, ii);
                     ii += 1;
                 }
                 // bracket row ]
@@ -785,6 +831,7 @@ SQLMATH_API void dbExec(
         // loop over each row - end
         switch (responseType) {
         case SQLITE_RESPONSETYPE_LASTBLOB:
+        case SQLITE_RESPONSETYPE_LASTVALUE:
             break;
         default:
             if (nCol != -1) {
@@ -797,6 +844,7 @@ SQLMATH_API void dbExec(
     // loop over each table - end
     switch (responseType) {
     case SQLITE_RESPONSETYPE_LASTBLOB:
+    case SQLITE_RESPONSETYPE_LASTVALUE:
         break;
     default:
         // bracket database ]
@@ -833,7 +881,7 @@ SQLMATH_API void dbFileLoad(
     int errcode = dbFileLoadOrSave(     //
         (sqlite3 *) jsbatonGetInt64(baton, 0),  // sqlite3 * pInMemory
         jsbatonGetString(baton, 1),     // char *zFilename
-        (const int) jsbatonGetInt64(baton, 2)); // const int isSave
+        (int) jsbatonGetInt64(baton, 2));       // const int isSave
     JSBATON_ASSERT_OK();
   catch_error:
     (void) 0;
@@ -1045,7 +1093,7 @@ SQLMATH_API void doublewinResultBlob(
 // This function will return <dblwin> as result-blob in given <context>.
     dblwin->alloc =
         sizeof(Doublewin) + (dblwin->nhead + dblwin->nbody) * sizeof(double);
-    sqlite3_result_blob(context, (const char *) dblwin, dblwin->alloc,
+    sqlite3_result_blob(context, (char *) dblwin, dblwin->alloc,
         // destructor
         sqlite3_free);
 }
@@ -1058,7 +1106,7 @@ SQLMATH_API void str99ArrayAppendDouble(
     const double xx
 ) {
 // This function will append double <xx> to <str99>.
-    sqlite3_str_append(str99, (const char *) &xx, 8);
+    sqlite3_str_append(str99, (char *) &xx, 8);
 }
 
 SQLMATH_API void str99ArrayAppendJsonarray(
@@ -1127,7 +1175,7 @@ SQLMATH_API void str99ResultBlob(
     sqlite3_context * context
 ) {
 // This function will return <str99> as result-blob in given <context>.
-    sqlite3_result_blob(context, (const char *) sqlite3_str_value(str99),
+    sqlite3_result_blob(context, (char *) sqlite3_str_value(str99),
         sqlite3_str_length(str99),
         // destructor
         sqlite3_free);
@@ -1138,7 +1186,7 @@ SQLMATH_API void str99ResultText(
     sqlite3_context * context
 ) {
 // This function will return <str99> as result-text in given <context>.
-    sqlite3_result_text(context, (const char *) sqlite3_str_value(str99),
+    sqlite3_result_text(context, (char *) sqlite3_str_value(str99),
         sqlite3_str_length(str99),
         // destructor
         sqlite3_free);
@@ -1317,6 +1365,19 @@ SQLMATH_API void sqlite3_result_double_or_null(
     sqlite3_result_double(context, isfinite(xx) ? xx : NAN);
 }
 
+SQLMATH_API void sqlite3_result_error2(
+    sqlite3_context * context,
+    const char *format,
+    ...                         // NOLINT
+) {
+// This function will return formatted error-message as sqlite-result.
+    static char errbuf[256] = { 0 };
+    va_list argptr;
+    va_start(argptr, format);
+    vsnprintf(errbuf, sizeof(errbuf), format, argptr);
+    sqlite3_result_error(context, errbuf, -1);
+}
+
 SQLMATH_API double sqlite3_value_double_or_nan(
     sqlite3_value * arg
 ) {
@@ -1377,7 +1438,7 @@ SQLMATH_FUNC static void sql1_casttextorempty_func(
         sqlite3_result_value(context, argv[0]);
         return;
     }
-    sqlite3_result_text(context, (const char *) sqlite3_value_text(argv[0]),
+    sqlite3_result_text(context, (char *) sqlite3_value_text(argv[0]),
 // ^If the 3rd parameter to the sqlite3_result_text* interfaces
 // is negative, then SQLite takes result text from the 2nd parameter
 // through the first zero character.
@@ -1451,7 +1512,7 @@ SQLMATH_FUNC static void sql1_doublearray_array_func(
     for (int ii = 0; ii < argc; ii += 1) {
         arr[ii] = sqlite3_value_double_or_nan(argv[ii]);
     }
-    sqlite3_result_blob(context, (const char *) arr, argc * sizeof(double),
+    sqlite3_result_blob(context, (char *) arr, argc * sizeof(double),
         // destructor
         sqlite3_free);
 }
@@ -1467,7 +1528,7 @@ SQLMATH_FUNC static void sql1_doublearray_extract_func(
     const int ii = sqlite3_value_int(argv[1]);
     const int nn = sqlite3_value_bytes(argv[0]) / sizeof(double);
     if (0 <= ii && ii < nn) {
-        const double xx = ((const double *) sqlite3_value_blob(argv[0]))[ii];
+        const double xx = ((double *) sqlite3_value_blob(argv[0]))[ii];
         if (isfinite(xx)) {
             sqlite3_result_double(context, xx);
             return;
@@ -1489,7 +1550,7 @@ SQLMATH_FUNC static void sql1_doublearray_jsonfrom_func(
     STR99_ALLOCA(str99);
     str99ArrayAppendJsonarray(  //
         str99,                  // array
-        (const char *) sqlite3_value_blob(argv[0]),     // json
+        (char *) sqlite3_value_blob(argv[0]),   // json
         sqlite3_value_bytes(argv[0]));  // nn
     STR99_RESULT_ERROR(str99);
     // str99 - result
@@ -1506,7 +1567,7 @@ SQLMATH_FUNC static void sql1_doublearray_jsonto_func(
 // This function will return json-encoded-flat-array from binary-double-array.
     UNUSED_PARAMETER(argc);
     jsonResultDoublearray(context,
-        (const double *) sqlite3_value_blob(argv[0]),
+        (double *) sqlite3_value_blob(argv[0]),
         sqlite3_value_bytes(argv[0]) / sizeof(double));
 }
 
@@ -1521,6 +1582,233 @@ SQLMATH_FUNC static void sql1_fmod_func(
             sqlite3_value_double_or_nan(argv[0]),       //
             sqlite3_value_double_or_nan(argv[1])));
 }
+
+// SQLMATH_FUNC sql1_lgbm_xxx_func - start
+// https://lightgbm.readthedocs.io/en/latest/C-API.html
+static void *lgbm_library = NULL;
+
+SQLMATH_FUNC static void sql1_lgbm_dlopen_func(
+    sqlite3_context * context,
+    int argc,
+    sqlite3_value ** argv
+) {
+// This function will init lgbm.
+    UNUSED_PARAMETER(argc);
+    UNUSED_PARAMETER(argv);
+    if (lgbm_library != NULL) {
+        sqlite3_result_null(context);
+        return;
+    }
+    const char *filename = (char *) sqlite3_value_text(argv[0]);
+#ifdef _WIN32
+    if (filename == NULL) {
+        filename = "./lib_lightgbm.dll";
+    }
+    HMODULE hModule = LoadLibrary(filename);
+    if (hModule == NULL) {
+        sqlite3_result_error2(context,
+            "lgbm_dlopen() - failed with error=%lu", GetLastError());
+        return;
+    }
+#else
+    if (filename == NULL) {
+#ifdef __APPLE__
+        filename = "./lib_lightgbm.dylib";
+#else
+        filename = "./lib_lightgbm.so";
+#endif
+    }
+    void *hModule = dlopen(filename, RTLD_LAZY);
+    if (hModule == NULL) {
+        sqlite3_result_error2(context, "lgbm_dlopen() - %s", dlerror());
+        return;
+    }
+#endif
+    lgbm_library = (void *) hModule;
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterAddValidData);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterCalcNumPredict);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterCreate);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterCreateFromModelfile);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterDumpModel);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterFeatureImportance);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterFree);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterFreePredictSparse);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterGetCurrentIteration);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterGetEval);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterGetEvalCounts);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterGetEvalNames);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterGetFeatureNames);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterGetLeafValue);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterGetLinear);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterGetLowerBoundValue);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterGetNumClasses);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterGetNumFeature);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterGetNumPredict);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterGetPredict);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterGetUpperBoundValue);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterLoadModelFromString);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterMerge);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterNumModelPerIteration);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterNumberOfTotalModel);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterPredictForCSC);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterPredictForCSR);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterPredictForCSRSingleRow);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterPredictForCSRSingleRowFast);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterPredictForCSRSingleRowFastInit);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterPredictForFile);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterPredictForMat);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterPredictForMatSingleRow);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterPredictForMatSingleRowFast);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterPredictForMatSingleRowFastInit);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterPredictForMats);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterPredictSparseOutput);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterRefit);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterResetParameter);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterResetTrainingData);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterRollbackOneIter);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterSaveModel);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterSaveModelToString);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterSetLeafValue);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterShuffleModels);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterUpdateOneIter);
+    LGBM_IMPORT_FUNCTION(LGBM_BoosterUpdateOneIterCustom);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetAddFeaturesFrom);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetCreateByReference);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetCreateFromCSC);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetCreateFromCSR);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetCreateFromCSRFunc);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetCreateFromFile);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetCreateFromMat);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetCreateFromMats);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetCreateFromSampledColumn);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetDumpText);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetFree);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetGetFeatureNames);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetGetField);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetGetNumData);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetGetNumFeature);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetGetSubset);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetPushRows);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetPushRowsByCSR);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetSaveBinary);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetSetFeatureNames);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetSetField);
+    LGBM_IMPORT_FUNCTION(LGBM_DatasetUpdateParamChecking);
+    LGBM_IMPORT_FUNCTION(LGBM_FastConfigFree);
+    LGBM_IMPORT_FUNCTION(LGBM_GetLastError);
+    LGBM_IMPORT_FUNCTION(LGBM_GetSampleCount);
+    LGBM_IMPORT_FUNCTION(LGBM_NetworkFree);
+    LGBM_IMPORT_FUNCTION(LGBM_NetworkInit);
+    LGBM_IMPORT_FUNCTION(LGBM_NetworkInitWithFunctions);
+    LGBM_IMPORT_FUNCTION(LGBM_RegisterLogCallback);
+    LGBM_IMPORT_FUNCTION(LGBM_SampleIndices);
+    sqlite3_result_null(context);
+}
+
+SQLMATH_FUNC static void sql1_lgbm_datasetcreatefromfile_func(
+    sqlite3_context * context,
+    int argc,
+    sqlite3_value ** argv
+) {
+// This function will load dataset <out> from file
+// (like LightGBM CLI version does).
+    UNUSED_PARAMETER(argc);
+    DatasetHandle out = NULL;
+    int errcode = 0;
+    errcode = LGBM_DatasetCreateFromFile(       //
+        (char *) sqlite3_value_text(argv[0]),   // const char *filename,
+        (char *) sqlite3_value_text(argv[1]),   // const char *parameters,
+        // const DatasetHandle reference,
+        (DatasetHandle) (intptr_t) sqlite3_value_int64(argv[2]),        //
+        &out);                  // DatasetHandle * out
+    LGBM_ASSERT_OK();
+    sqlite3_result_int64(context, (intptr_t) out);
+}
+
+SQLMATH_FUNC static void sql1_lgbm_datasetcreatefrommat_func(
+    sqlite3_context * context,
+    int argc,
+    sqlite3_value ** argv
+) {
+// This function will create dataset <out> from dense matrix <data>.
+    UNUSED_PARAMETER(argc);
+    DatasetHandle out = NULL;
+    int errcode = 0;
+    errcode = LGBM_DatasetCreateFromMat(        //
+        sqlite3_value_blob(argv[0]),    // const void *data,
+        sqlite3_value_int(argv[1]),     // int data_type,
+        (int32_t) sqlite3_value_int(argv[2]),   // int32_t nrow,
+        (int32_t) sqlite3_value_int(argv[3]),   // int32_t ncol,
+        sqlite3_value_int(argv[4]),     // int is_row_major,
+        (char *) sqlite3_value_text(argv[5]),   // const char *parameters,
+        // const DatasetHandle reference,
+        (DatasetHandle) (intptr_t) sqlite3_value_int64(argv[6]),        //
+        &out);                  // DatasetHandle *out
+    LGBM_ASSERT_OK();
+    sqlite3_result_int64(context, (intptr_t) out);
+}
+
+SQLMATH_FUNC static void sql1_lgbm_datasetdumptext_func(
+    sqlite3_context * context,
+    int argc,
+    sqlite3_value ** argv
+) {
+// This function will save dataset <handle> to text file <filename>,
+// intended for debugging use only.
+    UNUSED_PARAMETER(argc);
+    int errcode = 0;
+    errcode = LGBM_DatasetDumpText(     //
+        (DatasetHandle) (intptr_t) sqlite3_value_int64(argv[0]),
+        (char *) sqlite3_value_text(argv[1]));
+    LGBM_ASSERT_OK();
+    sqlite3_result_null(context);
+}
+
+SQLMATH_FUNC static void sql1_lgbm_datasetfree_func(
+    sqlite3_context * context,
+    int argc,
+    sqlite3_value ** argv
+) {
+// This function will free space for dataset <handle>.
+    UNUSED_PARAMETER(argc);
+    int errcode = 0;
+    errcode = LGBM_DatasetFree( //
+        (DatasetHandle) (intptr_t) sqlite3_value_int64(argv[0]));
+    LGBM_ASSERT_OK();
+    sqlite3_result_null(context);
+}
+
+SQLMATH_FUNC static void sql1_lgbm_datasetgetnumdata_func(
+    sqlite3_context * context,
+    int argc,
+    sqlite3_value ** argv
+) {
+// This function will get number of datapoints from dataset <handle>.
+    UNUSED_PARAMETER(argc);
+    int errcode = 0;
+    int result = 0;
+    errcode = LGBM_DatasetGetNumData(   //
+        (DatasetHandle) (intptr_t) sqlite3_value_int64(argv[0]), &result);
+    LGBM_ASSERT_OK();
+    sqlite3_result_int(context, result);
+}
+
+SQLMATH_FUNC static void sql1_lgbm_datasetgetnumfeature_func(
+    sqlite3_context * context,
+    int argc,
+    sqlite3_value ** argv
+) {
+// This function will get number of features from dataset <handle>.
+    UNUSED_PARAMETER(argc);
+    int errcode = 0;
+    int result = 0;
+    errcode = LGBM_DatasetGetNumFeature(        //
+        (DatasetHandle) (intptr_t) sqlite3_value_int64(argv[0]), &result);
+    LGBM_ASSERT_OK();
+    sqlite3_result_int(context, result);
+}
+
+// SQLMATH_FUNC sql1_lgbm_xxx_func - end
 
 SQLMATH_FUNC static void sql1_marginoferror95_func(
     sqlite3_context * context,
@@ -2022,7 +2310,7 @@ SQLMATH_FUNC static void sql1_coinflip_extract_func(
     }
     const WinCoinflip *agg =
         (WinCoinflip *) sqlite3_value_blob(argv[0]) + icol;
-    const char *key = (const char *) sqlite3_value_text(argv[2]);
+    const char *key = (char *) sqlite3_value_text(argv[2]);
     const char *keyList[] = {
         "nflip",
         "nhead",
@@ -2389,7 +2677,7 @@ SQLMATH_FUNC static void sql3_win_sinefit2_value(
 //     yy = laa + lbb*xx + saa*sin(sww*xx + spp)
     // dblwin - init
     DOUBLEWIN_AGGREGATE_CONTEXT(0);
-    const WinSinefit *wsf = (const WinSinefit *) dblwin_head;
+    const WinSinefit *wsf = (WinSinefit *) dblwin_head;
     // dblwin - result
     doublearrayResult(context, dblwin_head,     //
         // If x-current == x-refit, then include extra data needed for refit.
@@ -2526,7 +2814,7 @@ SQLMATH_FUNC static void sql1_sinefit_extract_func(
         return;
     }
     const WinSinefit *wsf = (WinSinefit *) sqlite3_value_blob(argv[0]) + icol;
-    const char *key = (const char *) sqlite3_value_text(argv[2]);
+    const char *key = (char *) sqlite3_value_text(argv[2]);
     const char *keyList[] = {
         "laa",
         "lbb",
@@ -2724,7 +3012,7 @@ SQLMATH_FUNC static void sql1_sinefit_refitlast_func(
         xxyy += WIN_SINEFIT_STEP;
     }
     // dblwin - result
-    doublearrayResult(context, (const double *) wsf0, bytes / sizeof(double),
+    doublearrayResult(context, (double *) wsf0, bytes / sizeof(double),
         sqlite3_free);
     return;
   catch_error:
@@ -3070,6 +3358,13 @@ int sqlite3_sqlmath_base_init(
     SQLITE3_CREATE_FUNCTION1(doublearray_jsonfrom, 1);
     SQLITE3_CREATE_FUNCTION1(doublearray_jsonto, 1);
     SQLITE3_CREATE_FUNCTION1(fmod, 2);
+    SQLITE3_CREATE_FUNCTION1(lgbm_datasetcreatefromfile, 3);
+    SQLITE3_CREATE_FUNCTION1(lgbm_datasetcreatefrommat, 7);
+    SQLITE3_CREATE_FUNCTION1(lgbm_datasetdumptext, 2);
+    SQLITE3_CREATE_FUNCTION1(lgbm_datasetfree, 1);
+    SQLITE3_CREATE_FUNCTION1(lgbm_datasetgetnumdata, 1);
+    SQLITE3_CREATE_FUNCTION1(lgbm_datasetgetnumfeature, 1);
+    SQLITE3_CREATE_FUNCTION1(lgbm_dlopen, 1);
     SQLITE3_CREATE_FUNCTION1(marginoferror95, 2);
     SQLITE3_CREATE_FUNCTION1(normalizewithsqrt, 1);
     SQLITE3_CREATE_FUNCTION1(normalizewithsquared, 1);
@@ -3108,11 +3403,6 @@ file sqlmath_nodejs - start
 */
 #if defined(SQLMATH_NODEJS_C2) && !defined(SQLMATH_NODEJS_C3)
 #define SQLMATH_NODEJS_C3
-
-
-#ifdef WIN32
-#include <windows.h>
-#endif
 
 
 // file sqlmath_nodejs - assert
@@ -3226,7 +3516,7 @@ static napi_value jsbatonStealCbuffer(
     // reference-steal sqlite-buffer to nodejs-string
     if (modestr) {
         errcode = napi_create_string_utf8(env,  // napi_env env
-            (const char *) sqlite_buf->buf,     // const char* str
+            (char *) sqlite_buf->buf,   // const char* str
             (size_t) sqlite_buf->len,   // size_t length
             &result);           // napi_value* result
         sqlite3_free((void *) sqlite_buf->buf);
@@ -3498,7 +3788,7 @@ static PyObject *pybatonStealCbuffer(
     // reference-steal sqlite-buffer to python-str
     if (modestr) {
         PyObject *python_str = PyUnicode_Decode(        //
-            (const char *) sqlite_buf->buf,     //
+            (char *) sqlite_buf->buf,   //
             sqlite_buf->len,    //
             "utf-8",            //
             "surrogatepass");

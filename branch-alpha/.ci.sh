@@ -18,6 +18,15 @@
         rm -rf ".$DIR"
         mv "$DIR" ".$DIR"
     done
+    for FILE in \
+        lib_lightgbm.dll \
+        lib_lightgbm.dylib \
+        lib_lightgbm.so
+    do
+        curl -L \
+https://github.com/microsoft/LightGBM/releases/download/v3.3.5/$FILE \
+            > $FILE
+    done
 "
 
 shCiArtifactUploadCustom() {(set -e
@@ -483,6 +492,7 @@ shSqlmathUpdate() {(set -e
     then
         shRollupFetch asset_sqlmath_external_rollup.js
         shRollupFetch index.html
+        shRollupFetch sqlmath_base.h
         shRollupFetch sqlmath_external_sqlite.c
         shRollupFetch sqlmath_external_zlib.c
         return

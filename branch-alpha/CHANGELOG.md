@@ -4,6 +4,13 @@
 - sqlmath - Add sqlite-extension for lightgbm.
 - none
 
+# v2024.6.1-beta
+- sqlmath - Add function dbExecAndReturnLastValue().
+- sqlmath - Replace functions:
+    dbExecAndReturnFirstRow() with dbExecAndReturnLastRow()
+    dbExecAndReturnFirstTable() with dbExecAndReturnLastTable()
+- sqlmath - Add sqlite-extension for lightgbm. - part1
+
 # v2024.5.26
 - webdemo - Replace market-indices .spx/.ndx/.dji with futures .es/.nq/.ym.
 - sqlite - Decouple c-function str99JsonAppendText() from builtin-function jsonAppendString().

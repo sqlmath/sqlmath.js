@@ -44,6 +44,7 @@ let SQLITE_DATATYPE_NULL = 0x05;
 let SQLITE_DATATYPE_TEXT = 0x03;
 let SQLITE_DATATYPE_TEXT_0 = 0x13;
 let SQLITE_RESPONSETYPE_LASTBLOB = 1;
+let SQLITE_RESPONSETYPE_LASTVALUE = 2;
 
 let FILENAME_DBTMP = "/tmp/__dbtmp1"; //jslint-ignore-line
 let IS_BROWSER;
@@ -105,7 +106,7 @@ let {
 let sqlMessageDict = {}; // dict of web-worker-callbacks
 let sqlMessageId = 0;
 let sqlWorker;
-let version = "v2024.5.26";
+let version = "v2024.6.1-beta";
 
 async function assertErrorThrownAsync(asyncFunc, regexp) {
 
@@ -310,16 +311,6 @@ async function ciBuildExt1NodejsConfigure({
             "cflags": [
                 "-Wextra",
                 "-std=c11"
-            ],
-            "conditions": [
-                [
-                    "OS == 'win'",
-                    {
-                        "defines": [
-                            "WIN32"
-                        ]
-                    }
-                ]
             ],
 // https://github.com/nodejs/node-gyp/blob/v9.3.1/gyp/pylib/gyp/MSVSSettings.py
             "msvs_settings": {
@@ -626,52 +617,7 @@ async function dbCloseAsync(db) {
     }));
 }
 
-async function dbExecAndReturnFirstRow({
-    bindList = [],
-    db,
-    sql
-}) {
-
-// This function will exec <sql> in <db>,
-// and return first-row or empty-object.
-
-    return (
-        noop(
-            noop(
-                await dbExecAsync({
-                    bindList,
-                    db,
-                    sql
-                })
-            )[0]
-            || []
-        )[0]
-        || {}
-    );
-}
-
-async function dbExecAndReturnFirstTable({
-    bindList = [],
-    db,
-    sql
-}) {
-
-// This function will exec <sql> in <db>,
-// and return first-table or empty-list.
-
-    return (
-        noop(
-            await dbExecAsync({
-                bindList,
-                db,
-                sql
-            })
-        )[0]
-        || []
-    );
-}
-
-function dbExecAndReturnLastBlobAsync({
+function dbExecAndReturnLastBlob({
     bindList = [],
     db,
     sql
@@ -684,6 +630,52 @@ function dbExecAndReturnLastBlobAsync({
         bindList,
         db,
         responseType: "lastblob",
+        sql
+    });
+}
+
+async function dbExecAndReturnLastRow({
+    bindList = [],
+    db,
+    sql
+}) {
+
+// This function will exec <sql> in <db>,
+// and return last-row or empty-object.
+
+    let result = await dbExecAsync({bindList, db, sql});
+    result = result[result.length - 1] || [];
+    result = result[result.length - 1] || {};
+    return result;
+}
+
+async function dbExecAndReturnLastTable({
+    bindList = [],
+    db,
+    sql
+}) {
+
+// This function will exec <sql> in <db>,
+// and return last-table or empty-list.
+
+    let result = await dbExecAsync({bindList, db, sql});
+    result = result[result.length - 1] || [];
+    return result;
+}
+
+function dbExecAndReturnLastValue({
+    bindList = [],
+    db,
+    sql
+}) {
+
+// This function will exec <sql> in <db>,
+// and return last-json-value.
+
+    return dbExecAsync({
+        bindList,
+        db,
+        responseType: "lastvalue",
         sql
     });
 }
@@ -743,6 +735,8 @@ async function dbExecAsync({
             (
                 responseType === "lastblob"
                 ? SQLITE_RESPONSETYPE_LASTBLOB
+                : responseType === "lastvalue"
+                ? SQLITE_RESPONSETYPE_LASTVALUE
                 : 0
             )
         ],
@@ -762,6 +756,7 @@ async function dbExecAsync({
     case "arraybuffer":
     case "lastblob":
         return result;
+    case "lastvalue":
     case "list":
         return jsonParseArraybuffer(result);
     default:
@@ -1338,9 +1333,12 @@ function jsonParseArraybuffer(buf) {
 // This function will JSON.parse arraybuffer <buf>.
 
     return JSON.parse(
-        IS_BROWSER
-        ? new TextDecoder().decode(buf)
-        : buf
+        (
+            IS_BROWSER
+            ? new TextDecoder().decode(buf)
+            : buf
+        )
+        || "null"
     );
 }
 
@@ -1739,9 +1737,10 @@ export {
     childProcessSpawn2,
     ciBuildExt,
     dbCloseAsync,
-    dbExecAndReturnFirstRow,
-    dbExecAndReturnFirstTable,
-    dbExecAndReturnLastBlobAsync,
+    dbExecAndReturnLastBlob,
+    dbExecAndReturnLastRow,
+    dbExecAndReturnLastTable,
+    dbExecAndReturnLastValue,
     dbExecAsync,
     dbFileLoadAsync,
     dbFileSaveAsync,
