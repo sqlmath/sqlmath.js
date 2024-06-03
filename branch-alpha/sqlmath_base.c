@@ -37,16 +37,14 @@ file sqlmath_h - start
 #   undef SRC_SQLITE_BASE_C2
 #   ifndef SQLMATH_BASE_C2
 #       define SQLMATH_BASE_C2
-#   endif
-#endif
+#   endif                       // SQLMATH_BASE_C2
+#endif                          // SRC_SQLITE_BASE_C2
 #ifdef _WIN32
 #   include <windows.h>
 #else
 #   include <dlfcn.h>
-#endif
-#ifdef SQLMATH_BASE_C2
-#   include "sqlmath_base.h"
-#endif
+#   include <unistd.h>
+#endif                          // _WIN32
 
 
 #include <assert.h>
@@ -57,6 +55,7 @@ file sqlmath_h - start
 #include <stdlib.h>
 #include <string.h>
 #include "sqlmath_external_sqlite.c"
+#include "./sqlmath_base.h"
 
 
 /*
@@ -69,7 +68,7 @@ file sqlmath_h - start
 #  define SQLITE_NOINLINE  __declspec(noinline)
 #else
 #  define SQLITE_NOINLINE
-#endif
+#endif                          // defined(__GNUC__)
 
 
 #define JSBATON_ARGC            8
@@ -96,14 +95,14 @@ file sqlmath_h - start
 #define SQLITE_RESPONSETYPE_LASTVALUE   2
 
 
-#define SQLITE_ERROR_DATATYPE_INVALID   0x10003
-#define SQLITE_ERROR_JSON_ARRAY_INVALID         0x71
-#define SQLITE_ERROR_ZSQL_NULL          0x10004
 #define MATH_MAX(aa, bb) (((aa) < (bb)) ? (bb) : (aa))
 #define MATH_MIN(aa, bb) (((aa) > (bb)) ? (bb) : (aa))
 #define MATH_PI 3.141592653589793238463
 #define MATH_SIGN(aa) (((aa) < 0) ? -1 : ((aa) > 0) ? 1 : 0)
 #define MATH_SWAP(aa, bb, tmp) tmp = (aa); (aa) = (bb); (bb) = tmp
+#define SQLITE_ERROR_DATATYPE_INVALID   0x10003
+#define SQLITE_ERROR_JSON_ARRAY_INVALID         0x71
+#define SQLITE_ERROR_ZSQL_NULL          0x10004
 #define SQLMATH_API
 #define SQLMATH_FUNC
 #define UNUSED_PARAMETER(x) ((void)(x))
@@ -139,18 +138,18 @@ file sqlmath_h - start
     }
 
 #define LGBM_ASSERT_OK() \
-    if (errcode != 0) { \
+    if (errcode) { \
         sqlite3_result_error(context, LGBM_GetLastError(), -1); \
-        return; \
+        goto catch_error; \
     }
 
 #ifdef _WIN32
 #define LGBM_IMPORT_FUNCTION(func) \
-        func = (func##_t) GetProcAddress(hModule, #func);
+        func = (func##_t) GetProcAddress((HMODULE) lgbm_library, #func);
 #else
 #define LGBM_IMPORT_FUNCTION(func) \
-        func = (func##_t) dlsym(hModule, #func);
-#endif
+        func = (func##_t) dlsym(lgbm_library, #func);
+#endif                          // _WIN32
 
 // This function will if <cond> is falsy, terminate process with <msg>.
 #define NAPI_ASSERT_FATAL(cond, msg) \
@@ -199,27 +198,27 @@ file sqlmath_h - start
         return; \
     }
 
-#define SQLITE3_CREATE_FUNCTION1(func, argc) \
-    errcode = sqlite3_create_function(db, #func, argc, \
-        SQLITE_DETERMINISTIC | SQLITE_DIRECTONLY | SQLITE_UTF8, NULL, \
-        sql1_##func##_func, NULL, NULL); \
-    if (errcode != SQLITE_OK) { return errcode; }
-
-#define SQLITE3_CREATE_FUNCTION2(func, argc) \
-    errcode = sqlite3_create_function(db, #func, argc, \
-        SQLITE_DETERMINISTIC | SQLITE_DIRECTONLY | SQLITE_UTF8, NULL, \
-        NULL, sql2_##func##_step, sql2_##func##_final); \
-    if (errcode != SQLITE_OK) { return errcode; }
-
-#define SQLITE3_CREATE_FUNCTION3(func, argc) \
-    errcode = sqlite3_create_window_function(db, #func, argc, \
-        SQLITE_DETERMINISTIC | SQLITE_DIRECTONLY | SQLITE_UTF8, NULL, \
-        sql3_##func##_step, sql3_##func##_final, \
-        sql3_##func##_value, sql3_##func##_inverse, NULL); \
-    if (errcode != SQLITE_OK) { return errcode; }
-
 #define SQLITE_OK_OR_RETURN_RC(rc) \
     if (rc != SQLITE_OK) { return rc; }
+
+#define SQL_CREATE_FUNC1(func, argc, flag) \
+    errcode = sqlite3_create_function(db, #func, argc, \
+        flag | SQLITE_DIRECTONLY | SQLITE_UTF8, NULL, \
+        sql1_##func##_func, NULL, NULL); \
+    if (errcode) { return errcode; }
+
+#define SQL_CREATE_FUNC2(func, argc, flag) \
+    errcode = sqlite3_create_function(db, #func, argc, \
+        flag | SQLITE_DIRECTONLY | SQLITE_UTF8, NULL, \
+        NULL, sql2_##func##_step, sql2_##func##_final); \
+    if (errcode) { return errcode; }
+
+#define SQL_CREATE_FUNC3(func, argc, flag) \
+    errcode = sqlite3_create_window_function(db, #func, argc, \
+        flag | SQLITE_DIRECTONLY | SQLITE_UTF8, NULL, \
+        sql3_##func##_step, sql3_##func##_final, \
+        sql3_##func##_value, sql3_##func##_inverse, NULL); \
+    if (errcode) { return errcode; }
 
 #define STR99_ALLOCA(str99) \
     sqlite3_str __##str99 = { 0 }; \
@@ -231,7 +230,7 @@ file sqlmath_h - start
     if (errcode == SQLITE_ERROR_JSON_ARRAY_INVALID) { \
         sqlite3_str_reset(str99); \
         sqlite3_result_error(context, \
-            "str99ArrayAppendJsonarray() - invalid JSON array", -1); \
+            "str99ArrayAppendJsonarray - invalid JSON array", -1); \
         goto catch_error; \
     } \
     if (errcode) { \
@@ -241,7 +240,6 @@ file sqlmath_h - start
     } \
     if (sqlite3_str_length(str99) <= 0) { \
         sqlite3_str_reset(str99); \
-        sqlite3_result_null(context); \
         goto catch_error; \
     }
 
@@ -275,6 +273,11 @@ SQLMATH_API void dbCall(
 SQLMATH_API void dbClose(
     Jsbaton * baton
 );
+SQLMATH_API int dbDlopen(
+    sqlite3_context * context,
+    const char *filename,
+    void **library
+);
 SQLMATH_API void dbExec(
     Jsbaton * baton
 );
@@ -283,7 +286,7 @@ SQLMATH_API void dbFileLoad(
 );
 SQLMATH_API int dbFileLoadOrSave(
     sqlite3 * pInMemory,
-    char *zFilename,
+    const char *zFilename,
     const int isSave
 );
 SQLMATH_API void dbNoop(
@@ -292,7 +295,6 @@ SQLMATH_API void dbNoop(
 SQLMATH_API void dbOpen(
     Jsbaton * baton
 );
-
 
 
 // file sqlmath_h - doublewin
@@ -314,7 +316,7 @@ SQLMATH_API int doublewinAggmalloc(
 );
 SQLMATH_API int doublewinAggpush(
     Doublewin ** dblwinAgg,
-    double xx
+    const double xx
 );
 SQLMATH_API double *doublewinBody(
     const Doublewin * dblwin
@@ -516,6 +518,50 @@ SQLMATH_API void dbClose(
     (void) 0;
 }
 
+SQLMATH_API int dbDlopen(
+    sqlite3_context * context,
+    const char *filename,
+    void **library
+) {
+// This function will set <library> = dlopen(<filename>).
+    static const intptr_t isBusy = 1;
+    for (int ii = 0; *library == (void *) isBusy && ii < 100; ii += 1) {
+#ifdef _WIN32
+        Sleep(100);
+#else
+        sleep(100);
+#endif                          // _WIN32
+    }
+    if (*library == (void *) isBusy) {
+        *library = (void *) 0;
+        sqlite3_result_error2(context, "dbDlopen - dlopen(\"%s\") timeout",
+            filename);
+        return SQLITE_BUSY;
+    }
+    if (*library > (void *) isBusy) {
+        return 0;
+    }
+    *library = (void *) isBusy;
+#ifdef _WIN32
+    *library = (void *) LoadLibrary(filename);
+    if (*library == NULL) {
+        sqlite3_result_error2(context,
+            "dbDlopen - LoadLibrary(\"%s\") failed with code=%lu", filename,
+            GetLastError());
+        return SQLITE_ERROR;
+    }
+#else
+    *library = dlopen(filename, RTLD_NOW | RTLD_GLOBAL);
+    if (*library == NULL) {
+        // fprintf(stderr, "%s", dlerror());
+        sqlite3_result_error2(context, "dbDlopen - dlopen(\"%s\") - %s",
+            filename, dlerror());
+        return SQLITE_ERROR;
+    }
+#endif                          // _WIN32
+    return 0;
+}
+
 // SQLMATH_API dbExec - start
 typedef struct DbExecBindElem {
     const char *buf;
@@ -597,10 +643,10 @@ SQLMATH_API void dbExec(
     STR99_ALLOCA(str99);
     // fprintf(stderr, "\nsqlmath._dbExec(db=%p blen=%d sql=%s)\n",
     //     db, bindListLength, zSql);
-#ifndef EMSCRIPTEN
+#ifndef __EMSCRIPTEN__
     // mutex enter
     sqlite3_mutex_enter(sqlite3_db_mutex(db));
-#endif                          // EMSCRIPTEN
+#endif                          // __EMSCRIPTEN__
     if (zSql == NULL) {
         errcode = SQLITE_ERROR_ZSQL_NULL;
         JSBATON_ASSERT_OK();
@@ -674,7 +720,7 @@ SQLMATH_API void dbExec(
         }
         errcode = sqlite3_prepare_v2(db, zSql, -1, &pStmt, &zTmp);
         JSBATON_ASSERT_OK();
-        if (errcode != 0 || *zSql == '\x00') {
+        if (errcode || *zSql == '\x00') {
             break;
         }
         zSql = zTmp;
@@ -862,13 +908,13 @@ SQLMATH_API void dbExec(
     // cleanup bindList
     sqlite3_free(bindList);
     // cleanup str99
-    if (errcode != SQLITE_OK && str99->zText) {
+    if (errcode && str99->zText) {
         sqlite3_free(str99->zText);
     }
-#ifndef EMSCRIPTEN
+#ifndef __EMSCRIPTEN__
     // mutex leave
     sqlite3_mutex_leave(sqlite3_db_mutex(db));
-#endif                          // EMSCRIPTEN
+#endif                          // __EMSCRIPTEN__
 }
 
 // SQLMATH_API dbExec - end
@@ -889,7 +935,7 @@ SQLMATH_API void dbFileLoad(
 
 SQLMATH_API int dbFileLoadOrSave(
     sqlite3 * pInMemory,
-    char *zFilename,
+    const char *zFilename,
     const int isSave
 ) {
     // fprintf(stderr, "\nsqlmath._dbFileLoadOrSave(pp=%p ff=%s ss=%d)\n",
@@ -1029,7 +1075,7 @@ SQLMATH_API int doublewinAggmalloc(
 
 SQLMATH_API int doublewinAggpush(
     Doublewin ** dblwinAgg,
-    double xx
+    const double xx
 ) {
     if (dblwinAgg == NULL || *dblwinAgg == NULL) {
         return SQLITE_NOMEM;
@@ -1345,7 +1391,6 @@ SQLMATH_API void jsonResultDoublearray(
     }
     if (sqlite3_str_length(str99) <= 0) {
         sqlite3_str_reset(str99);
-        sqlite3_result_null(context);
         return;
     }
     str99ResultText(str99, context);
@@ -1462,6 +1507,129 @@ SQLMATH_FUNC static void sql1_casttextorempty_func(
         SQLITE_TRANSIENT);
 }
 
+// SQLMATH_FUNC sql1_zlib_xxx_func - start
+typedef unsigned long z_ulong;  // NOLINT
+
+int compress(
+    unsigned char *,
+    z_ulong *,
+    const unsigned char *,
+    z_ulong
+);
+
+int uncompress(
+    unsigned char *,
+    z_ulong *,
+    const unsigned char *,
+    z_ulong *
+);
+
+SQLMATH_FUNC static void sql1_zlib_compress_func(
+    sqlite3_context * context,
+    int argc,
+    sqlite3_value ** argv
+) {
+/*
+** Implementation of the "compress(X)" SQL function.  The input X is
+** compressed using zLib and the output is returned.
+**
+** The output is a BLOB that begins with a variable-length integer that
+** is the input size in bytes (the size of X before compression).  The
+** variable-length integer is implemented as 1 to 5 bytes.  There are
+** seven bits per integer stored in the lower seven bits of each byte.
+** More significant bits occur first.  The most significant bit (0x80)
+** is a flag to indicate the end of the integer.
+**
+** This function, SQLAR, and ZIP all use the same "deflate" compression
+** algorithm, but each is subtly different:
+**
+**   *  ZIP uses raw deflate.
+**
+**   *  SQLAR uses the "zlib format" which is raw deflate with a two-byte
+**      algorithm-identification header and a four-byte checksum at the end.
+**
+**   *  This utility uses the "zlib format" like SQLAR, but adds the variable-
+**      length integer uncompressed size value at the beginning.
+**
+** This function might be extended in the future to support compression
+** formats other than deflate, by providing a different algorithm-id
+** mark following the variable-length integer size parameter.
+*/
+    UNUSED_PARAMETER(argc);
+    const unsigned char *pIn = NULL;
+    int ii = 0;
+    int jj = 0;
+    int nIn = 0;
+    int rc = 0;
+    unsigned char *pOut = NULL;
+    unsigned char x[8] = { 0 };
+    z_ulong nOut = 0;
+    pIn = sqlite3_value_blob(argv[0]);
+    if (pIn == NULL) {
+        sqlite3_result_error(context, "Cannot compress() NULL blob", -1);
+        return;
+    }
+    nIn = sqlite3_value_bytes(argv[0]);
+    nOut = 13 + nIn + (nIn + 999) / 1000;
+    pOut = sqlite3_malloc(nOut + 5);
+    for (ii = 4; ii >= 0; ii--) {
+        x[ii] = (nIn >> (7 * (4 - ii))) & 0x7f;
+    }
+    for (ii = 0; ii < 4 && x[ii] == 0; ii += 1) {
+    }
+    for (jj = 0; ii <= 4; ii += 1, jj += 1)
+        pOut[jj] = x[ii];
+    pOut[jj - 1] |= 0x80;
+    rc = compress(&pOut[jj], &nOut, pIn, nIn);
+    if (rc) {
+        sqlite3_free(pOut);
+        return;
+    }
+    sqlite3_result_blob(context, pOut, nOut + jj, sqlite3_free);
+}
+
+SQLMATH_FUNC static void sql1_zlib_uncompress_func(
+    sqlite3_context * context,
+    int argc,
+    sqlite3_value ** argv
+) {
+/*
+** Implementation of the "uncompress(X)" SQL function.  The argument X
+** is a blob which was obtained from compress(Y).  The output will be
+** the value Y.
+*/
+    UNUSED_PARAMETER(argc);
+    const unsigned char *pIn = NULL;
+    int ii = 0;
+    int nIn = 0;
+    int rc = 0;
+    unsigned char *pOut = NULL;
+    z_ulong nOut = 0;
+    pIn = sqlite3_value_blob(argv[0]);
+    if (pIn == NULL) {
+        sqlite3_result_error(context, "Cannot uncompress() NULL blob", -1);
+        return;
+    }
+    nIn = sqlite3_value_bytes(argv[0]);
+    nOut = 0;
+    for (ii = 0; ii < nIn && ii < 5; ii += 1) {
+        nOut = (nOut << 7) | (pIn[ii] & 0x7f);
+        if ((pIn[ii] & 0x80) != 0) {
+            ii += 1;
+            break;
+        }
+    }
+    pOut = sqlite3_malloc(nOut + 1);
+    rc = uncompress(pOut, &nOut, &pIn[ii], (z_ulong *) (intptr_t) (nIn - ii));
+    if (rc) {
+        sqlite3_free(pOut);
+        return;
+    }
+    sqlite3_result_blob(context, pOut, nOut, sqlite3_free);
+}
+
+// SQLMATH_FUNC sql1_zlib_xxx_func - end
+
 SQLMATH_FUNC static void sql1_copyblob_func(
     sqlite3_context * context,
     int argc,
@@ -1501,7 +1669,6 @@ SQLMATH_FUNC static void sql1_doublearray_array_func(
 ) {
 // This function will return binary-double-array from <argv>.
     if (argc <= 0) {
-        sqlite3_result_null(context);
         return;
     }
     double *arr = sqlite3_malloc(argc * sizeof(double));
@@ -1534,7 +1701,6 @@ SQLMATH_FUNC static void sql1_doublearray_extract_func(
             return;
         }
     }
-    sqlite3_result_null(context);
 }
 
 SQLMATH_FUNC static void sql1_doublearray_jsonfrom_func(
@@ -1594,37 +1760,21 @@ SQLMATH_FUNC static void sql1_lgbm_dlopen_func(
 ) {
 // This function will init lgbm.
     UNUSED_PARAMETER(argc);
-    UNUSED_PARAMETER(argv);
-    if (lgbm_library != NULL) {
-        sqlite3_result_null(context);
-        return;
-    }
     const char *filename = (char *) sqlite3_value_text(argv[0]);
-#ifdef _WIN32
+    int errcode = 0;
     if (filename == NULL) {
+#if defined(_WIN32)
         filename = "./lib_lightgbm.dll";
-    }
-    HMODULE hModule = LoadLibrary(filename);
-    if (hModule == NULL) {
-        sqlite3_result_error2(context,
-            "lgbm_dlopen() - failed with error=%lu", GetLastError());
-        return;
-    }
-#else
-    if (filename == NULL) {
-#ifdef __APPLE__
-        filename = "./lib_lightgbm.dylib";
+#elif defined(__APPLE__)
+        filename = "/opt/homebrew/lib/lib_lightgbm.dylib";
 #else
         filename = "./lib_lightgbm.so";
-#endif
+#endif                          // defined(_WIN32)
     }
-    void *hModule = dlopen(filename, RTLD_LAZY);
-    if (hModule == NULL) {
-        sqlite3_result_error2(context, "lgbm_dlopen() - %s", dlerror());
+    errcode = dbDlopen(context, filename, (void **) &lgbm_library);
+    if (errcode) {
         return;
     }
-#endif
-    lgbm_library = (void *) hModule;
     LGBM_IMPORT_FUNCTION(LGBM_BoosterAddValidData);
     LGBM_IMPORT_FUNCTION(LGBM_BoosterCalcNumPredict);
     LGBM_IMPORT_FUNCTION(LGBM_BoosterCreate);
@@ -1702,7 +1852,6 @@ SQLMATH_FUNC static void sql1_lgbm_dlopen_func(
     LGBM_IMPORT_FUNCTION(LGBM_NetworkInitWithFunctions);
     LGBM_IMPORT_FUNCTION(LGBM_RegisterLogCallback);
     LGBM_IMPORT_FUNCTION(LGBM_SampleIndices);
-    sqlite3_result_null(context);
 }
 
 SQLMATH_FUNC static void sql1_lgbm_datasetcreatefromfile_func(
@@ -1710,7 +1859,7 @@ SQLMATH_FUNC static void sql1_lgbm_datasetcreatefromfile_func(
     int argc,
     sqlite3_value ** argv
 ) {
-// This function will load dataset <out> from file
+// This function will load dataset <out> from file.
 // (like LightGBM CLI version does).
     UNUSED_PARAMETER(argc);
     DatasetHandle out = NULL;
@@ -1719,10 +1868,12 @@ SQLMATH_FUNC static void sql1_lgbm_datasetcreatefromfile_func(
         (char *) sqlite3_value_text(argv[0]),   // const char *filename,
         (char *) sqlite3_value_text(argv[1]),   // const char *parameters,
         // const DatasetHandle reference,
-        (DatasetHandle) (intptr_t) sqlite3_value_int64(argv[2]),        //
+        (DatasetHandle) sqlite3_value_int64(argv[2]),   //
         &out);                  // DatasetHandle * out
     LGBM_ASSERT_OK();
-    sqlite3_result_int64(context, (intptr_t) out);
+    sqlite3_result_int64(context, (int64_t) out);
+  catch_error:
+    (void) 0;
 }
 
 SQLMATH_FUNC static void sql1_lgbm_datasetcreatefrommat_func(
@@ -1742,10 +1893,12 @@ SQLMATH_FUNC static void sql1_lgbm_datasetcreatefrommat_func(
         sqlite3_value_int(argv[4]),     // int is_row_major,
         (char *) sqlite3_value_text(argv[5]),   // const char *parameters,
         // const DatasetHandle reference,
-        (DatasetHandle) (intptr_t) sqlite3_value_int64(argv[6]),        //
+        (DatasetHandle) sqlite3_value_int64(argv[6]),   //
         &out);                  // DatasetHandle *out
     LGBM_ASSERT_OK();
-    sqlite3_result_int64(context, (intptr_t) out);
+    sqlite3_result_int64(context, (int64_t) out);
+  catch_error:
+    (void) 0;
 }
 
 SQLMATH_FUNC static void sql1_lgbm_datasetdumptext_func(
@@ -1758,10 +1911,11 @@ SQLMATH_FUNC static void sql1_lgbm_datasetdumptext_func(
     UNUSED_PARAMETER(argc);
     int errcode = 0;
     errcode = LGBM_DatasetDumpText(     //
-        (DatasetHandle) (intptr_t) sqlite3_value_int64(argv[0]),
+        (DatasetHandle) sqlite3_value_int64(argv[0]),
         (char *) sqlite3_value_text(argv[1]));
     LGBM_ASSERT_OK();
-    sqlite3_result_null(context);
+  catch_error:
+    (void) 0;
 }
 
 SQLMATH_FUNC static void sql1_lgbm_datasetfree_func(
@@ -1773,9 +1927,10 @@ SQLMATH_FUNC static void sql1_lgbm_datasetfree_func(
     UNUSED_PARAMETER(argc);
     int errcode = 0;
     errcode = LGBM_DatasetFree( //
-        (DatasetHandle) (intptr_t) sqlite3_value_int64(argv[0]));
+        (DatasetHandle) sqlite3_value_int64(argv[0]));
     LGBM_ASSERT_OK();
-    sqlite3_result_null(context);
+  catch_error:
+    (void) 0;
 }
 
 SQLMATH_FUNC static void sql1_lgbm_datasetgetnumdata_func(
@@ -1788,9 +1943,11 @@ SQLMATH_FUNC static void sql1_lgbm_datasetgetnumdata_func(
     int errcode = 0;
     int result = 0;
     errcode = LGBM_DatasetGetNumData(   //
-        (DatasetHandle) (intptr_t) sqlite3_value_int64(argv[0]), &result);
+        (DatasetHandle) sqlite3_value_int64(argv[0]), &result);
     LGBM_ASSERT_OK();
     sqlite3_result_int(context, result);
+  catch_error:
+    (void) 0;
 }
 
 SQLMATH_FUNC static void sql1_lgbm_datasetgetnumfeature_func(
@@ -1803,9 +1960,162 @@ SQLMATH_FUNC static void sql1_lgbm_datasetgetnumfeature_func(
     int errcode = 0;
     int result = 0;
     errcode = LGBM_DatasetGetNumFeature(        //
-        (DatasetHandle) (intptr_t) sqlite3_value_int64(argv[0]), &result);
+        (DatasetHandle) sqlite3_value_int64(argv[0]), &result);
     LGBM_ASSERT_OK();
     sqlite3_result_int(context, result);
+  catch_error:
+    (void) 0;
+}
+
+SQLMATH_FUNC static void sql1_lgbm_datasetsavebinary_func(
+    sqlite3_context * context,
+    int argc,
+    sqlite3_value ** argv
+) {
+// This function will save dataset <handle> to binary file <filename>.
+    UNUSED_PARAMETER(argc);
+    int errcode = 0;
+    errcode = LGBM_DatasetSaveBinary(   //
+        (DatasetHandle) sqlite3_value_int64(argv[0]),
+        (char *) sqlite3_value_text(argv[1]));
+    LGBM_ASSERT_OK();
+  catch_error:
+    (void) 0;
+}
+
+SQLMATH_FUNC static void sql1_lgbm_modelpredictforfile_func(
+    sqlite3_context * context,
+    int argc,
+    sqlite3_value ** argv
+) {
+// This function will make prediction for file from <model>.
+    UNUSED_PARAMETER(argc);
+    BoosterHandle booster = NULL;
+    int errcode = 0;
+    int out_num_iterations = 0;
+    errcode = LGBM_BoosterLoadModelFromString(  //
+        (char *) sqlite3_value_text(argv[0]),   // const char *model_str,
+        &out_num_iterations,    // int *out_num_iterations,
+        &booster);              // BoosterHandle *out
+    LGBM_ASSERT_OK();
+    // fprintf(stderr, "lgbm_modelpredictforfile - out_num_iterations=%d\n",
+    //     out_num_iterations);
+    errcode = LGBM_BoosterPredictForFile(       //
+        booster,                // BoosterHandle handle,
+        (char *) sqlite3_value_text(argv[1]),   // const char *data_filename,
+        sqlite3_value_int(argv[2]),     // int data_has_header,
+        sqlite3_value_int(argv[3]),     // int predict_type,
+        sqlite3_value_int(argv[4]),     // int start_iteration,
+        sqlite3_value_int(argv[5]),     // int num_iteration,
+        (char *) sqlite3_value_text(argv[6]),   // const char *parameter,
+        (char *) sqlite3_value_text(argv[7]));  // const char *result_filename
+    LGBM_ASSERT_OK();
+  catch_error:
+    LGBM_BoosterFree(booster);
+}
+
+SQLMATH_FUNC static void sql1_lgbm_train_func(
+    sqlite3_context * context,
+    int argc,
+    sqlite3_value ** argv
+) {
+// This function will create-and-train <model> from training data.
+    UNUSED_PARAMETER(argc);
+    // booster - init
+    const DatasetHandle train_data =
+        (DatasetHandle) sqlite3_value_int64(argv[0]);
+    const DatasetHandle test_data =
+        (DatasetHandle) sqlite3_value_int64(argv[1]);
+    const int num_boost_round = sqlite3_value_int(argv[2]);
+    const int eval_step = sqlite3_value_int(argv[3]);
+    const char *parameters = (char *) sqlite3_value_text(argv[4]);
+    BoosterHandle booster = NULL;
+    char *model = NULL;
+    int errcode = 0;
+    errcode = LGBM_BoosterCreate(       //
+        train_data,             // const DatasetHandle train_data,
+        parameters,             // const char *parameters,
+        &booster);              // BoosterHandle *out
+    LGBM_BoosterAddValidData(booster, test_data);
+    LGBM_ASSERT_OK();
+    // booster - train
+#define LGBM_EVAL_BUF_LEN_MAX 16
+#define LGBM_EVAL_OUT_LEN_MAX 8
+    char *eval_names[LGBM_EVAL_OUT_LEN_MAX] = { 0 };
+    char eval_buf[LGBM_EVAL_OUT_LEN_MAX * LGBM_EVAL_BUF_LEN_MAX] = { 0 };
+    double eval_results[LGBM_EVAL_OUT_LEN_MAX] = { 0 };
+    int eval_len = 0;
+    int is_finished = 0;
+    size_t eval_name_len = 0;
+    for (int ii = 0; ii < LGBM_EVAL_OUT_LEN_MAX; ii += 1) {
+        eval_names[ii] = &eval_buf[ii * LGBM_EVAL_BUF_LEN_MAX];
+    }
+    errcode = LGBM_BoosterGetEvalCounts(booster, &eval_len);
+    LGBM_ASSERT_OK();
+    if (eval_len > LGBM_EVAL_OUT_LEN_MAX) {
+        sqlite3_result_error2(context,
+            "lgbm_train - number-of-metrics must be <= %d",
+            LGBM_EVAL_OUT_LEN_MAX);
+        goto catch_error;
+    }
+    errcode = LGBM_BoosterGetEvalNames( //
+        booster,                // BoosterHandle handle,
+        LGBM_EVAL_OUT_LEN_MAX,  // const int len,
+        &eval_len,              // int *out_len,
+        LGBM_EVAL_BUF_LEN_MAX,  // const size_t buffer_len,
+        &eval_name_len,         // size_t *out_buffer_len,
+        (char **) eval_names);  // char **out_strs
+    LGBM_ASSERT_OK();
+    for (int ii = 0; ii < num_boost_round; ii += 1) {
+        errcode = LGBM_BoosterUpdateOneIter(booster, &is_finished);
+        LGBM_ASSERT_OK();
+        errcode = LGBM_BoosterGetEval(  //
+            booster,            // BoosterHandle handle,
+            0,                  // int data_idx,
+            &eval_len,          // int *out_len,
+            eval_results);      // double *out_results
+        LGBM_ASSERT_OK();
+        if ((ii + 1) % eval_step == 0) {
+            fprintf(stderr, "    lgbm_train - round %d -", ii);
+            for (int jj = 0; jj < eval_len; jj += 1) {
+                fprintf(stderr, " %s=%.6f", eval_names[jj], eval_results[jj]);
+            }
+            fprintf(stderr, "\n");
+        }
+    }
+    // booster - save
+    int64_t model_len = 0;
+    errcode = LGBM_BoosterSaveModelToString(    //
+        booster,                // BoosterHandle handle,
+        0,                      // int start_iteration,
+        -1,                     // int num_iteration,
+        C_API_FEATURE_IMPORTANCE_SPLIT, // int feature_importance_type,
+        // C_API_FEATURE_IMPORTANCE_GAIN,  // int feature_importance_type,
+        0,                      // int64_t buffer_len,
+        &model_len,             // int64_t *out_len,
+        model);                 // char *out_str
+    LGBM_ASSERT_OK();
+    model = sqlite3_malloc((int) model_len);
+    if (model == NULL) {
+        sqlite3_result_error_nomem(context);
+        goto catch_error;
+    }
+    errcode = LGBM_BoosterSaveModelToString(    //
+        booster,                // BoosterHandle handle,
+        0,                      // int start_iteration,
+        -1,                     // int num_iteration,
+        C_API_FEATURE_IMPORTANCE_SPLIT, // int feature_importance_type,
+        // C_API_FEATURE_IMPORTANCE_GAIN,  // int feature_importance_type,
+        model_len,              // int64_t buffer_len,
+        &model_len,             // int64_t *out_len,
+        model);                 // char *out_str
+    LGBM_ASSERT_OK();
+    sqlite3_result_blob(context, model, model_len, sqlite3_free);
+  catch_error:
+    LGBM_BoosterFree(booster);
+    if (errcode) {
+        sqlite3_free(model);
+    }
 }
 
 // SQLMATH_FUNC sql1_lgbm_xxx_func - end
@@ -1958,6 +2268,100 @@ SQLMATH_FUNC static void sql1_throwerror_func(
     sqlite3_result_error_code(context, SQLITE_INTERNAL);
 }
 
+// SQLMATH_FUNC lgbm_datasetcreatefromtable - start
+typedef struct LgbmDataset {
+    DatasetHandle ref;
+    char param;
+} LgbmDataset;
+
+SQLMATH_FUNC static void sql2_lgbm_datasetcreatefromtable_final(
+    sqlite3_context * context
+) {
+// This function will aggregate sql-table into lgbm-dataset.
+    float *label = NULL;
+    // dblwin - init
+    DOUBLEWIN_AGGREGATE_CONTEXT(0);
+    // dblwin - null-case
+    if (dblwin->nbody == 0) {
+        goto catch_error;
+    }
+    LgbmDataset *dataset = (LgbmDataset *) dblwin_head;
+    // init label
+    DatasetHandle out = NULL;
+    const int ncol = (int) dblwin->ncol;
+    const int nrow = (int) dblwin->nbody / dblwin->ncol;
+    int errcode = 0;
+    label = sqlite3_malloc(nrow * sizeof(float));
+    if (label == NULL) {
+        sqlite3_result_error_nomem(context);
+        goto catch_error;
+    }
+    int kk = 0;
+    int ll = 0;
+    for (int ii = 0; ii < nrow; ii += 1) {
+        label[ii] = (float) dblwin_body[kk];
+        kk += 1;
+        for (int jj = 1; jj < ncol; jj += 1) {
+            dblwin_body[ll] = dblwin_body[kk];
+            kk += 1;
+            ll += 1;
+        }
+    }
+    errcode = LGBM_DatasetCreateFromMat(        //
+        dblwin_body,            // const void *data,
+        C_API_DTYPE_FLOAT64,    // int data_type,
+        (int32_t) nrow,         // int32_t nrow,
+        (int32_t) ncol - 1,     // int32_t ncol,
+        1,                      // int is_row_major,
+        &dataset->param,        // const char *parameters,
+        dataset->ref,           // const DatasetHandle reference,
+        &out);                  // DatasetHandle *out
+    LGBM_ASSERT_OK();
+    errcode = LGBM_DatasetSetField(     //
+        out,                    // DatasetHandle handle,
+        "label\x00",            // const char *field_name,
+        label,                  // const void *field_data,
+        nrow,                   // int num_element,
+        C_API_DTYPE_FLOAT32);   // int type
+    LGBM_ASSERT_OK();
+    sqlite3_result_int64(context, (int64_t) out);
+  catch_error:
+    doublewinAggfree(dblwinAgg);
+    sqlite3_free(label);
+}
+
+SQLMATH_FUNC static void sql2_lgbm_datasetcreatefromtable_step(
+    sqlite3_context * context,
+    int argc,
+    sqlite3_value ** argv
+) {
+// This function will aggregate sql-table into lgbm-dataset.
+    static int argc0 = 2;
+    int param_bytes = sqlite3_value_bytes(argv[0]);
+    const int ncol = argc - argc0;
+    DOUBLEWIN_AGGREGATE_CONTEXT(        //
+        (sizeof(LgbmDataset) + param_bytes) / 8 //
+        + 1);
+    if (dblwin->nbody == 0) {
+        // dbwin - init ncol
+        dblwin->ncol = ncol;
+        // dataset - init
+        LgbmDataset *dataset = (LgbmDataset *) dblwin_head;
+        dataset->ref = (DatasetHandle) sqlite3_value_int64(argv[1]);
+        if (param_bytes > 0) {
+            memcpy(&dataset->param, sqlite3_value_text(argv[0]), param_bytes);
+            (&dataset->param)[param_bytes] = 0;
+        }
+    }
+    // dblwin - push xx
+    for (int ii = 0; ii < ncol; ii += 1) {
+        DOUBLEWIN_AGGREGATE_PUSH(sqlite3_value_double_or_nan(argv[argc0 +
+                    ii]));
+    }
+}
+
+// SQLMATH_FUNC lgbm_datasetcreatefromtable - end
+
 // SQLMATH_FUNC sql2_quantile_func - start
 static double quickselect(
     double *arr,
@@ -2057,7 +2461,6 @@ SQLMATH_FUNC static void sql2_quantile_final(
     DOUBLEWIN_AGGREGATE_CONTEXT(0);
     // dblwin - null-case
     if (dblwin->nbody == 0) {
-        sqlite3_result_null(context);
         goto catch_error;
     }
     sqlite3_result_double(context, quantile(dblwin_body, dblwin->nbody,
@@ -2129,7 +2532,6 @@ SQLMATH_FUNC static void sql3_stdev_value(
     SQLITE3_AGGREGATE_CONTEXT(AggStdev);
     // agg - null-case
     if (agg->nnn <= 0) {
-        sqlite3_result_null(context);
         return;
     }
     sqlite3_result_double(context,
@@ -2262,7 +2664,7 @@ SQLMATH_FUNC static void sql3_win_coinflip2_step(
 // ranging from -0.5 (never head) to 0.0 (no bias) to 0.5 (always head).
     if (argc < 1) {
         sqlite3_result_error(context,
-            "win_coinflip2() - wrong number of arguments", -1);
+            "win_coinflip2 - wrong number of arguments", -1);
         return;
     }
     // dblwin - init
@@ -2296,14 +2698,14 @@ SQLMATH_FUNC static void sql1_coinflip_extract_func(
     const uint32_t bytes = (uint32_t) sqlite3_value_bytes(argv[0]);
     if (icol < 0) {
         sqlite3_result_error(context,
-            "coinflip_extract() - 2nd argument must be integer column >= 0",
+            "coinflip_extract - 2nd argument must be integer column >= 0",
             -1);
         return;
     }
     if (bytes <= 0 || SIZEOF_BLOB_MAX < bytes   //
         || bytes < (icol + 1) * WIN_COINFLIP_N * sizeof(double)) {
         sqlite3_result_error(context,
-            "coinflip_extract()"
+            "coinflip_extract"
             " - 1st argument as coinflip-object does not have enough columns",
             -1);
         return;
@@ -2354,7 +2756,7 @@ SQLMATH_FUNC static void sql1_coinflip_extract_func(
         return;
     }
     sqlite3_result_error(context,
-        "coinflip_extract() - 3rd argument is invalid key", -1);
+        "coinflip_extract - 3rd argument is invalid key", -1);
 }
 
 // SQLMATH_FUNC sql3_win_coinflip2_func - end
@@ -2728,7 +3130,7 @@ static void sql3_win_sinefit2_step(
     static const int argc0 = 2;
     if (argc < argc0 + 2 || (argc - argc0) % 2) {
         sqlite3_result_error(context,
-            "win_sinefit2() - wrong number of arguments", -1);
+            "win_sinefit2 - wrong number of arguments", -1);
         return;
     }
     // dblwin - init
@@ -2801,14 +3203,13 @@ SQLMATH_FUNC static void sql1_sinefit_extract_func(
     const uint32_t bytes = (uint32_t) sqlite3_value_bytes(argv[0]);
     if (icol < 0) {
         sqlite3_result_error(context,
-            "sinefit_extract() - 2nd argument must be integer column >= 0",
-            -1);
+            "sinefit_extract - 2nd argument must be integer column >= 0", -1);
         return;
     }
     if (bytes <= 0 || SIZEOF_BLOB_MAX < bytes   //
         || bytes < (icol + 1) * WIN_SINEFIT_N * sizeof(double)) {
         sqlite3_result_error(context,
-            "sinefit_extract()"
+            "sinefit_extract"
             " - 1st argument as sinefit-object does not have enough columns",
             -1);
         return;
@@ -2944,7 +3345,7 @@ SQLMATH_FUNC static void sql1_sinefit_extract_func(
         return;
     }
     sqlite3_result_error(context,
-        "sinefit_extract() - 3rd argument is invalid key", -1);
+        "sinefit_extract - 3rd argument is invalid key", -1);
 }
 
 SQLMATH_FUNC static void sql1_sinefit_refitlast_func(
@@ -2963,7 +3364,7 @@ SQLMATH_FUNC static void sql1_sinefit_refitlast_func(
     if (bytes <= 0 || SIZEOF_BLOB_MAX < bytes   //
         || bytes < ncol * WIN_SINEFIT_N * sizeof(double)) {
         sqlite3_result_error(context,
-            "sinefit_refitlast()"
+            "sinefit_refitlast"
             " - 1st argument as sinefit-object does not have enough columns",
             -1);
         return;
@@ -2973,7 +3374,7 @@ SQLMATH_FUNC static void sql1_sinefit_refitlast_func(
     if (blob0->nnn <= 0
         || bytes != (ncol * WIN_SINEFIT_N + nbody) * sizeof(double)) {
         sqlite3_result_error(context,
-            "sinefit_refitlast()"
+            "sinefit_refitlast"
             " - 1st argument as sinefit-object does not have enough columns",
             -1);
         return;
@@ -3016,8 +3417,8 @@ SQLMATH_FUNC static void sql1_sinefit_refitlast_func(
         sqlite3_free);
     return;
   catch_error:
-    sqlite3_result_error(context,
-        "sinefit_refitlast() - invalid arguments", -1);
+    sqlite3_result_error(context, "sinefit_refitlast - invalid arguments",
+        -1);
 }
 
 // SQLMATH_FUNC sql3_win_sinefit2_func - end
@@ -3066,8 +3467,8 @@ SQLMATH_FUNC static void sql3_win_ema1_step(
 ) {
 // This function will calculate running exponential-moving-average.
     if (argc < 2) {
-        sqlite3_result_error(context,
-            "win_ema2() - wrong number of arguments", -1);
+        sqlite3_result_error(context, "win_ema2 - wrong number of arguments",
+            -1);
         return;
     }
     // dblwin - init
@@ -3081,7 +3482,7 @@ SQLMATH_FUNC static void sql3_win_ema1_step(
         arg_alpha = sqlite3_value_double_or_nan(argv[0]);
         if (isnan(arg_alpha)) {
             sqlite3_result_error(context,
-                "win_emax() - invalid argument 'alpha'", -1);
+                "win_emax - invalid argument 'alpha'", -1);
             return;
         }
         dblwin_head[ncol + 0] = arg_alpha;
@@ -3119,7 +3520,7 @@ SQLMATH_FUNC static void sql3_win_ema2_value(
     // dblwin - init
     DOUBLEWIN_AGGREGATE_CONTEXT(0);
     if (!dblwin->ncol) {
-        sqlite3_result_null(context);
+        return;
     }
     // dblwin - result
     doublearrayResult(context, dblwin_body + (int) dblwin->waa,
@@ -3186,7 +3587,6 @@ SQLMATH_FUNC static void sql3_win_quantile1_inverse(
     sqlite3_value ** argv
 ) {
 // This function will calculate running quantile.
-    UNUSED_PARAMETER(argc);
     UNUSED_PARAMETER(argv);
     // dblwin - init
     DOUBLEWIN_AGGREGATE_CONTEXT(0);
@@ -3221,7 +3621,7 @@ SQLMATH_FUNC static void sql3_win_quantile1_step(
 // This function will calculate running quantile.
     if (argc < 2 || argc % 2) {
         sqlite3_result_error(context,
-            "win_quantile2() - wrong number of arguments", -1);
+            "win_quantile2 - wrong number of arguments", -1);
         return;
     }
     // dblwin - init
@@ -3247,7 +3647,7 @@ SQLMATH_FUNC static void sql3_win_quantile1_step(
         double argQuantile = sqlite3_value_double_or_nan(argv[2 * ii + 0]);
         if (!(0 <= argQuantile && argQuantile <= 1)) {
             sqlite3_result_error(context,
-                "win_quantilex()"
+                "win_quantilex"
                 " - argument 'quantile' must be between 0 and 1 inclusive",
                 -1);
             return;
@@ -3280,7 +3680,7 @@ SQLMATH_FUNC static void sql3_win_quantile2_value(
     // dblwin - init
     DOUBLEWIN_AGGREGATE_CONTEXT(0);
     if (!dblwin->ncol) {
-        sqlite3_result_null(context);
+        return;
     }
     // dblwin - result
     doublearrayResult(context, dblwin_head + (int) dblwin->ncol,
@@ -3341,55 +3741,54 @@ int sqlite3_sqlmath_base_init(
     UNUSED_PARAMETER(pzErrMsg);
     int errcode = 0;
     //
-    errcode = sqlite3_compress_init(db, pzErrMsg, pApi);
-    SQLITE_OK_OR_RETURN_RC(errcode);
     errcode = sqlite3_sqlmath_custom_init(db, pzErrMsg, pApi);
     SQLITE_OK_OR_RETURN_RC(errcode);
     //
-    SQLITE3_CREATE_FUNCTION1(castrealornull, 1);
-    SQLITE3_CREATE_FUNCTION1(castrealorzero, 1);
-    SQLITE3_CREATE_FUNCTION1(casttextorempty, 1);
-    SQLITE3_CREATE_FUNCTION1(coinflip_extract, 3);
-    SQLITE3_CREATE_FUNCTION1(copyblob, 1);
-    SQLITE3_CREATE_FUNCTION1(cot, 1);
-    SQLITE3_CREATE_FUNCTION1(coth, 1);
-    SQLITE3_CREATE_FUNCTION1(doublearray_array, -1);
-    SQLITE3_CREATE_FUNCTION1(doublearray_extract, 2);
-    SQLITE3_CREATE_FUNCTION1(doublearray_jsonfrom, 1);
-    SQLITE3_CREATE_FUNCTION1(doublearray_jsonto, 1);
-    SQLITE3_CREATE_FUNCTION1(fmod, 2);
-    SQLITE3_CREATE_FUNCTION1(lgbm_datasetcreatefromfile, 3);
-    SQLITE3_CREATE_FUNCTION1(lgbm_datasetcreatefrommat, 7);
-    SQLITE3_CREATE_FUNCTION1(lgbm_datasetdumptext, 2);
-    SQLITE3_CREATE_FUNCTION1(lgbm_datasetfree, 1);
-    SQLITE3_CREATE_FUNCTION1(lgbm_datasetgetnumdata, 1);
-    SQLITE3_CREATE_FUNCTION1(lgbm_datasetgetnumfeature, 1);
-    SQLITE3_CREATE_FUNCTION1(lgbm_dlopen, 1);
-    SQLITE3_CREATE_FUNCTION1(marginoferror95, 2);
-    SQLITE3_CREATE_FUNCTION1(normalizewithsqrt, 1);
-    SQLITE3_CREATE_FUNCTION1(normalizewithsquared, 1);
-    SQLITE3_CREATE_FUNCTION1(roundorzero, 2);
-    SQLITE3_CREATE_FUNCTION1(sinefit_extract, 4);
-    SQLITE3_CREATE_FUNCTION1(sinefit_refitlast, -1);
-    SQLITE3_CREATE_FUNCTION1(sqrtwithsign, 1);
-    SQLITE3_CREATE_FUNCTION1(squaredwithsign, 1);
-    SQLITE3_CREATE_FUNCTION1(squared, 1);
-    SQLITE3_CREATE_FUNCTION1(throwerror, 1);
-    SQLITE3_CREATE_FUNCTION2(median, 1);
-    SQLITE3_CREATE_FUNCTION2(quantile, 2);
-    SQLITE3_CREATE_FUNCTION3(stdev, 1);
-    SQLITE3_CREATE_FUNCTION3(win_coinflip2, -1);
-    SQLITE3_CREATE_FUNCTION3(win_ema1, 2);
-    SQLITE3_CREATE_FUNCTION3(win_ema2, -1);
-    SQLITE3_CREATE_FUNCTION3(win_quantile1, 2);
-    SQLITE3_CREATE_FUNCTION3(win_quantile2, -1);
-    SQLITE3_CREATE_FUNCTION3(win_sinefit2, -1);
-    errcode =
-        sqlite3_create_function(db, "random1", 0,
-        SQLITE_DIRECTONLY | SQLITE_UTF8, NULL, sql1_random1_func, NULL, NULL);
-    if (errcode != SQLITE_OK) {
-        return errcode;
-    }
+    SQL_CREATE_FUNC1(castrealornull, 1, SQLITE_DETERMINISTIC);
+    SQL_CREATE_FUNC1(castrealorzero, 1, SQLITE_DETERMINISTIC);
+    SQL_CREATE_FUNC1(casttextorempty, 1, SQLITE_DETERMINISTIC);
+    SQL_CREATE_FUNC1(coinflip_extract, 3, 0);
+    SQL_CREATE_FUNC1(copyblob, 1, 0);
+    SQL_CREATE_FUNC1(cot, 1, SQLITE_DETERMINISTIC);
+    SQL_CREATE_FUNC1(coth, 1, SQLITE_DETERMINISTIC);
+    SQL_CREATE_FUNC1(doublearray_array, -1, 0);
+    SQL_CREATE_FUNC1(doublearray_extract, 2, 0);
+    SQL_CREATE_FUNC1(doublearray_jsonfrom, 1, 0);
+    SQL_CREATE_FUNC1(doublearray_jsonto, 1, 0);
+    SQL_CREATE_FUNC1(fmod, 2, SQLITE_DETERMINISTIC);
+    SQL_CREATE_FUNC1(lgbm_datasetcreatefromfile, 3, 0);
+    SQL_CREATE_FUNC1(lgbm_datasetcreatefrommat, 7, 0);
+    SQL_CREATE_FUNC1(lgbm_datasetdumptext, 2, 0);
+    SQL_CREATE_FUNC1(lgbm_datasetfree, 1, 0);
+    SQL_CREATE_FUNC1(lgbm_datasetgetnumdata, 1, 0);
+    SQL_CREATE_FUNC1(lgbm_datasetgetnumfeature, 1, 0);
+    SQL_CREATE_FUNC1(lgbm_datasetsavebinary, 1, 0);
+    SQL_CREATE_FUNC1(lgbm_dlopen, 1, 0);
+    SQL_CREATE_FUNC1(lgbm_modelpredictforfile, 8, 0);
+    SQL_CREATE_FUNC1(lgbm_train, 5, 0);
+    SQL_CREATE_FUNC1(marginoferror95, 2, SQLITE_DETERMINISTIC);
+    SQL_CREATE_FUNC1(normalizewithsqrt, 1, SQLITE_DETERMINISTIC);
+    SQL_CREATE_FUNC1(normalizewithsquared, 1, SQLITE_DETERMINISTIC);
+    SQL_CREATE_FUNC1(random1, 1, 0);
+    SQL_CREATE_FUNC1(roundorzero, 2, SQLITE_DETERMINISTIC);
+    SQL_CREATE_FUNC1(sinefit_extract, 4, 0);
+    SQL_CREATE_FUNC1(sinefit_refitlast, -1, 0);
+    SQL_CREATE_FUNC1(sqrtwithsign, 1, SQLITE_DETERMINISTIC);
+    SQL_CREATE_FUNC1(squared, 1, SQLITE_DETERMINISTIC);
+    SQL_CREATE_FUNC1(squaredwithsign, 1, SQLITE_DETERMINISTIC);
+    SQL_CREATE_FUNC1(throwerror, 1, SQLITE_DETERMINISTIC);
+    SQL_CREATE_FUNC1(zlib_compress, 1, SQLITE_DETERMINISTIC);
+    SQL_CREATE_FUNC1(zlib_uncompress, 1, SQLITE_DETERMINISTIC);
+    SQL_CREATE_FUNC2(lgbm_datasetcreatefromtable, -1, 0);
+    SQL_CREATE_FUNC2(median, 1, 0);
+    SQL_CREATE_FUNC2(quantile, 2, 0);
+    SQL_CREATE_FUNC3(stdev, 1, 0);
+    SQL_CREATE_FUNC3(win_coinflip2, -1, 0);
+    SQL_CREATE_FUNC3(win_ema1, 2, 0);
+    SQL_CREATE_FUNC3(win_ema2, -1, 0);
+    SQL_CREATE_FUNC3(win_quantile1, 2, 0);
+    SQL_CREATE_FUNC3(win_quantile2, -1, 0);
+    SQL_CREATE_FUNC3(win_sinefit2, -1, 0);
     return 0;
 }
 #endif                          // SQLMATH_BASE_C3
@@ -3431,15 +3830,8 @@ static int napiAssertOk(
     napi_value val = NULL;
     // We must retrieve the last error info before doing anything else, because
     // doing anything else will replace the last error info.
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable: 26812)
-#endif
     errcode = napi_get_last_error_info(env, &info);
     NAPI_ASSERT_FATAL(errcode == 0, "napi_get_last_error_info");
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
     errcode = napi_is_exception_pending(env, &is_exception_pending);
     NAPI_ASSERT_FATAL(errcode == 0, "napi_is_exception_pending");
     // A pending exception takes precedence over any internal error status.

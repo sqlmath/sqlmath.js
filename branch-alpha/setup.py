@@ -115,6 +115,8 @@ async def build_ext_async(): # noqa: C901
                 "-Wno-implicit-fallthrough",
                 "-Wno-incompatible-pointer-types",
                 "-Wno-int-conversion",
+                "-Wno-unreachable-code",
+                "-Wno-unused-function",
                 "-Wno-unused-parameter",
             ]
 # https://github.com/nodejs/node-gyp/blob/v9.3.1/gyp/pylib/gyp/MSVSSettings.py

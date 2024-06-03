@@ -28,6 +28,7 @@ npm_config_mode_test_save2=1 npm test
 /*jslint beta, node*/
 import jslint from "./jslint.mjs";
 import {
+    LGBM_PREDICT_NORMAL,
     assertErrorThrownAsync,
     assertJsonEqual,
     assertNumericalEqual,
@@ -660,9 +661,9 @@ VALUES
     (?1, ?2, ?3),
     (CAST(?1 AS TEXT), CAST(?2 AS TEXT), CAST(?3 AS TEXT)),
     (
-        CAST(uncompress(compress(?1)) AS TEXT),
-        CAST(uncompress(compress(?2)) AS TEXT),
-        CAST(uncompress(compress(?3)) AS TEXT)
+        CAST(zlib_uncompress(zlib_compress(?1)) AS TEXT),
+        CAST(zlib_uncompress(zlib_compress(?2)) AS TEXT),
+        CAST(zlib_uncompress(zlib_compress(?3)) AS TEXT)
     );
 SELECT * FROM testDbExecAsync1;
 SELECT * FROM testDbExecAsync2;
@@ -844,41 +845,180 @@ jstestDescribe((
     jstestIt((
         "test lgbm handling-behavior"
     ), async function () {
-        let data;
         let db = await dbOpenAsync({filename: ":memory:"});
-        dbExecAsync({
-            db,
-            sql: (`
-SELECT lgbm_dlopen(NULL);
-
-DROP TABLE IF EXISTS __tmp1;
-CREATE TEMP TABLE __tmp1 AS
-    SELECT
-        lgbm_datasetcreatefromfile(
-            'test_lgbm_binary.train',
-            'max_bin=15',
-            0
-        ) AS handle;
-
-SELECT
-        lgbm_datasetdumptext(handle, '.tmp/test_lgbm_datasetdump.txt')
-    FROM __tmp1;
-            `)
-        });
-        data = await dbExecAndReturnLastRow({
-            db,
-            sql: (`
-SELECT
-        handle,
-        lgbm_datasetgetnumdata(handle) AS num_data,
-        lgbm_datasetgetnumfeature(handle) AS num_feature
-    FROM __tmp1;
-            `)
-        });
-        debugInline(data);
+        let filePreb = "test_lgbm_preb.txt";
+        let fileTest = "test_lgbm_binary.test";
+        let fileTrain = "test_lgbm_binary.train";
         await dbExecAsync({
             db,
-            sql: `SELECT lgbm_datasetfree(${data.handle});`
+            sql: "SELECT lgbm_dlopen(NULL);"
+        });
+        await Promise.all([
+            dbTableImportAsync({
+                db,
+                filename: fileTest,
+                headerMissing: true,
+                mode: "tsv",
+                tableName: "test_file_test"
+            }),
+            dbTableImportAsync({
+                db,
+                filename: fileTrain,
+                headerMissing: true,
+                mode: "tsv",
+                tableName: "test_file_train"
+            })
+        ]);
+        await dbExecAsync({
+            db,
+            sql: (`
+CREATE TABLE test_lgbm(
+    data_test_handle INTEGER,
+    data_test_num_data REAL,
+    data_test_num_feature REAL,
+    --
+    data_train_handle INTEGER,
+    data_train_num_data REAL,
+    data_train_num_feature REAL,
+    --
+    model BLOB
+);
+INSERT INTO test_lgbm(rowid) SELECT 1;
+UPDATE test_lgbm
+    SET
+        data_train_handle = (
+            SELECT
+                lgbm_datasetcreatefromfile(
+                    '${fileTrain}',
+                    'max_bin=15',
+                    0
+                )
+        );
+UPDATE test_lgbm
+    SET
+        data_test_handle = (
+            SELECT
+                lgbm_datasetcreatefromfile(
+                    '${fileTest}',
+                    'max_bin=15', -- parameters
+                    data_train_handle -- reference
+                )
+        );
+SELECT
+        lgbm_datasetfree(data_test_handle),
+        lgbm_datasetfree(data_train_handle)
+    FROM test_lgbm;
+UPDATE test_lgbm
+    SET
+        data_train_handle = (
+            SELECT
+                lgbm_datasetcreatefromtable(
+                    'max_bin=15', -- parameters
+                    0, -- reference
+                    c_1,  c_2,  c_3,  c_4,
+                    c_5,  c_6,  c_7,  c_8,
+                    c_9,  c_10, c_11, c_12,
+                    c_13, c_14, c_15, c_16,
+                    c_17, c_18, c_19, c_20,
+                    c_21, c_22, c_23, c_24,
+                    c_25, c_26, c_27, c_28,
+                    c_29
+                )
+            FROM test_file_train
+        );
+UPDATE test_lgbm
+    SET
+        data_test_handle = (
+            SELECT
+                lgbm_datasetcreatefromtable(
+                    'max_bin=15', -- parameters
+                    data_train_handle, -- reference
+                    c_1,  c_2,  c_3,  c_4,
+                    c_5,  c_6,  c_7,  c_8,
+                    c_9,  c_10, c_11, c_12,
+                    c_13, c_14, c_15, c_16,
+                    c_17, c_18, c_19, c_20,
+                    c_21, c_22, c_23, c_24,
+                    c_25, c_26, c_27, c_28,
+                    c_29
+                )
+            FROM test_file_test
+        );
+UPDATE test_lgbm
+    SET
+        data_test_num_data = lgbm_datasetgetnumdata(data_test_handle),
+        data_test_num_feature = lgbm_datasetgetnumfeature(data_test_handle),
+        data_train_num_data = lgbm_datasetgetnumdata(data_train_handle),
+        data_train_num_feature = lgbm_datasetgetnumfeature(data_train_handle);
+UPDATE test_lgbm
+    SET
+        model = lgbm_train(
+            data_train_handle,
+            data_test_handle,
+            50, -- num_boost_round
+            10, -- eval_step
+            'app=binary metric=auc num_leaves=31 verbose=0'
+        );
+SELECT
+        lgbm_modelpredictforfile(
+            model,                      -- model
+            '${fileTest}',              -- data_filename
+            0,                          -- data_has_header
+            ${LGBM_PREDICT_NORMAL},     -- predict_type
+            0,                          -- start_iteration
+            25,                         -- num_iteration
+            '',                         -- parameter
+            '.tmp/test_lgbm_preb.txt'   -- result_filename
+        )
+    FROM test_lgbm;
+SELECT
+        lgbm_modelpredictforfile(
+            model,                      -- model
+            '${fileTest}',              -- data_filename
+            0,                          -- data_has_header
+            ${LGBM_PREDICT_NORMAL},     -- predict_type
+            10,                         -- start_iteration
+            25,                         -- num_iteration
+            '',                         -- parameter
+            '.tmp/test_lgbm_preb.txt'   -- result_filename
+        )
+    FROM test_lgbm;
+            `)
+        });
+        assertJsonEqual(
+            noop(
+                await dbExecAndReturnLastRow({
+                    db,
+                    sql: (`
+SELECT
+        data_test_num_data,
+        data_test_num_feature,
+        data_train_num_data,
+        data_train_num_feature
+    FROM test_lgbm;
+                    `)
+                })
+            ),
+            {
+                "data_test_num_data": 500,
+                "data_test_num_feature": 28,
+                "data_train_num_data": 7000,
+                "data_train_num_feature": 28
+            }
+        );
+        assertJsonEqual(
+            await fsReadFileUnlessTest(".tmp/test_lgbm_preb.txt", "force"),
+            await fsReadFileUnlessTest(filePreb, "force")
+        );
+        // cleanup
+        await dbExecAsync({
+            db,
+            sql: (`
+SELECT
+        lgbm_datasetfree(data_test_handle),
+        lgbm_datasetfree(data_train_handle)
+    FROM test_lgbm;
+            `)
         });
     });
 });
@@ -1037,34 +1177,6 @@ SELECT doublearray_jsonto(doublearray_jsonfrom($valIn)) AS result;
                 valIn
             });
         }));
-    });
-    jstestIt((
-        "test sqlite-extension-fill_forward handling-behavior"
-    ), async function test_sqlite_extension_fill_forward() {
-        let db = await dbOpenAsync({filename: ":memory:"});
-        let result = await dbExecAsync({
-            db,
-            sql: (`
-SELECT
-    fill_forward(val) OVER (ORDER BY id ASC) AS val
-    FROM (
-        SELECT 10 AS id, NULL AS val
-        UNION ALL SELECT 9 AS id, 9 AS val
-        UNION ALL SELECT 8 AS id, 8 AS val
-        UNION ALL SELECT 7 AS id, NULL AS val
-        UNION ALL SELECT 6 AS id, 6 AS val
-        UNION ALL SELECT 5 AS id, 5 AS val
-        UNION ALL SELECT 4 AS id, NULL AS val
-        UNION ALL SELECT 3 AS id, 3 AS val
-        UNION ALL SELECT 2 AS id, NULL AS val
-        UNION ALL SELECT 1 AS id, NULL AS val
-    );
-            `)
-        });
-        result = result[0].map(function ({val}) {
-            return val;
-        });
-        assertJsonEqual(result, [null, null, 3, 3, 5, 6, 6, 8, 9, 9]);
     });
     jstestIt((
         "test sqlite-extension-math handling-behavior"
