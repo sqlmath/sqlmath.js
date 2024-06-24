@@ -611,18 +611,18 @@ string version
     );
 }</pre></li>
 <li>Example usage:<pre class="apidocCodePre">...
-            [10, 8],
-            [2, 5]
+            [1, "1"],
+            [0, undefined]
         ];
         await Promise.all([
             (async function () {
 let valActual;
-// test win_sinefit2-error handling-behavior
+// test win_sum2-error handling-behavior
 await <span class="apidocCodeKeywordSpan">assertErrorThrownAsync</span>(function () {
     return dbExecAsync({
         db,
         sql: (`
-SELECT win_sinefit2(1, 2, 3) FROM (SELECT 1);
+SELECT win_sum2() FROM (SELECT 1);
         `)
     });
 }, "wrong number of arguments");
@@ -691,21 +691,21 @@ SELECT win_sinefit2(1, 2, 3) FROM (SELECT 1);
     }
 }</pre></li>
 <li>Example usage:<pre class="apidocCodePre">...
-                valActual,
-                String("1").replace(npm_config_mode_test_save, "force")
-            );
-            valExpect = await fsReadFileUnlessTest(
-                "test_data_sinefit.csv",
-                "force"
-            );
-            <span class="apidocCodeKeywordSpan">assertJsonEqual</span>(valActual, valExpect);
-        }())
-    ]);
-});
-});
-
-jstestDescribe((
-"test_sqlmathWebworkerInit"
+CREATE TEMP TABLE __tmp1 (val REAL);
+SELECT win_sum1(1, 2) FROM __tmp1;
+                    `)
+                });
+                valActual = valActual.map(function ({val}) {
+                    return val;
+                });
+                <span class="apidocCodeKeywordSpan">assertJsonEqual</span>(valActual, [null]);
+                // test win_sum2-null-case handling-behavior
+                valActual = await dbExecAndReturnLastTable({
+                    db,
+                    sql: (`
+DROP TABLE IF EXISTS __tmp1;
+CREATE TEMP TABLE __tmp1 (val REAL);
+SELECT doublearray_jsonto(win_sum2(1, 2, 3)) FROM __tmp1;
 ...</pre></li>
 
 <li>
@@ -1081,21 +1081,21 @@ FROM (
     return result;
 }</pre></li>
 <li>Example usage:<pre class="apidocCodePre">...
-                    elem = elem.split(" ");
-                    return {
-                        date: elem[0],
-                        ii,
-                        priceClose: Number(elem[1])
-                    };
-                });
-                valActual = await <span class="apidocCodeKeywordSpan">dbExecAndReturnLastTable</span>({
-                    bindList: {
-                        testDataSpx
-                    },
-                    db,
-                    sql: (`
-DROP TABLE IF EXISTS __sinefit_csv;
-CREATE TEMP TABLE __sinefit_csv AS
+        db,
+        sql: (`
+SELECT win_sum2() FROM (SELECT 1);
+        `)
+    });
+}, "wrong number of arguments");
+// test win_sum1-null-case handling-behavior
+valActual = await <span class="apidocCodeKeywordSpan">dbExecAndReturnLastTable</span>({
+    db,
+    sql: (`
+DROP TABLE IF EXISTS __tmp1;
+CREATE TEMP TABLE __tmp1 (val REAL);
+SELECT win_sum1(1, 2) FROM __tmp1;
+    `)
+});
 ...</pre></li>
 
 <li>
@@ -1236,21 +1236,21 @@ assertJsonEqual(
 }
 </pre></li>
 <li>Example usage:<pre class="apidocCodePre">...
-            [2, 5]
+            [0, undefined]
         ];
         await Promise.all([
             (async function () {
 let valActual;
-// test win_sinefit2-error handling-behavior
+// test win_sum2-error handling-behavior
 await assertErrorThrownAsync(function () {
     return <span class="apidocCodeKeywordSpan">dbExecAsync</span>({
         db,
         sql: (`
-SELECT win_sinefit2(1, 2, 3) FROM (SELECT 1);
+SELECT win_sum2() FROM (SELECT 1);
         `)
     });
 }, "wrong number of arguments");
-// test win_sinefit2-null-case handling-behavior
+// test win_sum1-null-case handling-behavior
 ...</pre></li>
 
 <li>
@@ -1371,21 +1371,21 @@ data = await dbExecAsync({
     });
 }</pre></li>
 <li>Example usage:<pre class="apidocCodePre">...
-});
-assertErrorThrownAsync(function () {
-    return dbFileLoadAsync({
-        db
+        db,
+        filename: fileActual,
+        headerMissing: true,
+        mode: "tsv",
+        tableName: "__lgbm_table_preb"
     });
-}, "invalid filename undefined");
-assertErrorThrownAsync(function () {
-    return <span class="apidocCodeKeywordSpan">dbFileSaveAsync</span>({
-        db
-    });
-}, "invalid filename undefined");
-await dbExecAsync({
+}
+await <span class="apidocCodeKeywordSpan">dbFileSaveAsync</span>({
     db,
-    sql: "CREATE TABLE t01 AS SELECT 1 AS c01"
+    filename: `.tmp/test_lgbm_${sqlIi}.sqlite`
 });
+assertJsonEqual(
+    noop(
+        await dbExecAndReturnLastRow({
+            db,
 ...</pre></li>
 
 <li>
@@ -1450,6 +1450,7 @@ await dbExecAsync({
 // );
     let connPool;
     let db = {busy: 0, filename, ii: 0};
+    let fileLgbm;
     assertOrThrow(typeof filename === "string", `invalid filename ${filename}`);
     assertOrThrow(
         !dbData || isExternalBuffer(dbData),
@@ -1480,8 +1481,15 @@ await dbExecAsync({
         return ptr;
     }));
     db.connPool = connPool;
-    return db;
-}</pre></li>
+    // init lightgbm
+    if (!IS_BROWSER) {
+        fileLgbm = process.platform;
+        fileLgbm = fileLgbm.replace("darwin", "lib_lightgbm.dylib");
+        fileLgbm = fileLgbm.replace("win32", "lib_lightgbm.dll");
+        fileLgbm = fileLgbm.replace(process.platform, "lib_lightgbm.so");
+        fileLgbm = `${import.meta...
+}
+</pre></li>
 <li>Example usage:<pre class="apidocCodePre">...
 
 jstestDescribe((
@@ -1595,21 +1603,21 @@ jstestIt((
 }
 </pre></li>
 <li>Example usage:<pre class="apidocCodePre">...
-let fileTest = "test_lgbm_binary.test";
-let fileTrain = "test_lgbm_binary.train";
-await dbExecAsync({
-    db,
-    sql: "SELECT lgbm_dlopen(NULL);"
-});
-await Promise.all([
-    <span class="apidocCodeKeywordSpan">dbTableImportAsync</span>({
-        db,
-        filename: fileTest,
-        headerMissing: true,
-        mode: "tsv",
-        tableName: "test_file_test"
-    }),
-    dbTableImportAsync({
+SELECT
+    lgbm_datasetfree(data_test_handle),
+    lgbm_datasetfree(data_train_handle)
+FROM __lgbm_state;
+            `)
+        });
+        if (sqlPredictXxx === sqlPredictFile) {
+            <span class="apidocCodeKeywordSpan">dbTableImportAsync</span>({
+                db,
+                filename: fileActual,
+                headerMissing: true,
+                mode: "tsv",
+                tableName: "__lgbm_table_preb"
+            });
+        }
 ...</pre></li>
 
 <li>
