@@ -4,24 +4,8 @@
 # sh jslint_ci.sh shCiBuildWasm
 # sh jslint_ci.sh shSqlmathUpdate
 
-: "
-    for URL in \
-        https://github.com/madler/zlib/releases/download/v1.3/zlib-1.3.tar.gz \
-        https://www.sqlite.org/2023/sqlite-autoconf-3440200.tar.gz
-    do
-        curl -L "$URL" | tar -xz
-    done
-    for DIR in \
-        sqlite-autoconf-3440200 \
-        zlib-1.3
-    do
-        rm -rf ".$DIR"
-        mv "$DIR" ".$DIR"
-    done
-"
-
 shCiArtifactUploadCustom() {(set -e
-# this function will run custom-code to upload build-artifacts
+# This function will run custom-code to upload build-artifacts.
     git fetch origin artifact
     git checkout origin/artifact "branch-$GITHUB_BRANCH0"
     mv "branch-$GITHUB_BRANCH0"/* .
@@ -54,8 +38,37 @@ import moduleChildProcess from "child_process";
 )}
 
 shCiBaseCustom() {(set -e
-# this function will run custom-code for base-ci
+# This function will run custom-code for base-ci.
     shCiEmsdkExport
+    FILE="$(node --input-type=module -e '
+process.stdout.write(
+    process.platform === "darwin"
+    ? "lib_lightgbm.dylib"
+    : process.platform === "win32"
+    ? "lib_lightgbm.dll"
+    : "lib_lightgbm.so"
+);
+' "$@")" # '
+    # bugfix - Library not loaded: /usr/local/opt/libomp/lib/libomp.dylib
+    if [ ! -f "sqlmath/$FILE" ]
+    then
+        case "$(uname)" in
+        Darwin*)
+            brew install libomp
+            cp -L /opt/homebrew/opt/libomp/lib/libomp.dylib sqlmath/
+            pip install lightgbm=="$(printf "v4.4.0" | sed "s|v||")"
+            cp "$(
+                find "$(
+                    pip show ruff | grep Location | sed "s|Location: ||"
+                )/lightgbm" | grep "$FILE"
+            )" "sqlmath/$FILE"
+            ;;
+        *)
+            curl -L -o "sqlmath/$FILE" \
+"https://github.com/microsoft/LightGBM/releases/download/v4.4.0/$FILE"
+            ;;
+        esac
+    fi
     # .github_cache - restore
     if [ "$GITHUB_ACTION" ] && [ -d .github_cache ]
     then
@@ -131,7 +144,7 @@ import moduleChildProcess from "child_process";
 )}
 
 shCiBaseCustomArtifactUpload() {(set -e
-# this function will upload build-artifacts to branch-gh-pages
+# This function will upload build-artifacts to branch-gh-pages.
     COMMIT_MESSAGE="- upload artifact
 - retry$GITHUB_UPLOAD_RETRY
 - $GITHUB_BRANCH0
@@ -162,7 +175,7 @@ shCiBaseCustomArtifactUpload() {(set -e
         rm -f "branch-$GITHUB_BRANCH0/"*.tar.gz
         cp ../../dist/sqlmath-*.tar.gz "branch-$GITHUB_BRANCH0"
         ;;
-    MINGW64_NT*)
+    MINGW*)
         rm -f "branch-$GITHUB_BRANCH0/"*-win*
         rm -f "branch-$GITHUB_BRANCH0/"*_win*
         ;;
@@ -177,6 +190,17 @@ shCiBaseCustomArtifactUpload() {(set -e
     then
         cp ../../.artifact/asset_image_logo_* "branch-$GITHUB_BRANCH0"
     fi
+    for FILE in \
+        ../../sqlmath/lib_lightgbm.dll \
+        ../../sqlmath/lib_lightgbm.dylib \
+        ../../sqlmath/lib_lightgbm.so \
+        ../../sqlmath/libomp.dylib
+    do
+        if [ -f "$FILE" ]
+        then
+            cp "$FILE" "branch-$GITHUB_BRANCH0"
+        fi
+    done
     # save cibuildwheel
     cp ../../dist/sqlmath-*.whl "branch-$GITHUB_BRANCH0"
     # git commit
@@ -198,7 +222,7 @@ shCiBaseCustomArtifactUpload() {(set -e
 )}
 
 shCiBuildWasm() {(set -e
-# this function will build binaries in wasm
+# This function will build binaries in wasm.
     shCiEmsdkExport
     # install emsdk
     shCiEmsdkInstall
@@ -296,7 +320,7 @@ shCiBuildWasm() {(set -e
 )}
 
 shCiEmsdkExport() {
-# this function will export emsdk env
+# This function will export emsdk env.
     export EMSCRIPTEN_VERSION=3.1.3
     export EMSDK="$PWD/_emsdk"
     # https://github.com/sql-js/sql.js/blob/v1.6.2/.devcontainer/Dockerfile
@@ -308,7 +332,7 @@ shCiEmsdkExport() {
 }
 
 shCiEmsdkInstall() {(set -e
-# this function will install emsdk
+# This function will install emsdk.
     shCiEmsdkExport
     if [ -d "$EMSDK" ]
     then
@@ -357,7 +381,7 @@ shCiEmsdkInstall() {(set -e
 )}
 
 shIndentC() {(set -e
-# this function will indent/prettify c file
+# This function will indent/prettify c file.
     if (uname | grep -q "MING\|MSYS")
     then
         ./indent.exe \
@@ -376,7 +400,7 @@ shIndentC() {(set -e
 )}
 
 shCiLintCustom() {(set -e
-# this function will run custom-code to lint files
+# This function will run custom-code to lint files.
     if [ "$GITHUB_ACTION" ]
     then
         pip install pycodestyle ruff
@@ -388,7 +412,7 @@ shCiLintCustom() {(set -e
 )}
 
 shCiPublishNpmCustom() {(set -e
-# this function will run custom-code to npm-publish package
+# This function will run custom-code to npm-publish package.
     # fetch artifact
     git fetch origin artifact --depth=1
     git checkout origin/artifact \
@@ -401,7 +425,7 @@ shCiPublishNpmCustom() {(set -e
 )}
 
 shCiPublishPypiCustom() {(set -e
-# this function will run custom-code to npm-publish package
+# This function will run custom-code to npm-publish package.
     # fetch artifact
     git fetch origin artifact --depth=1
     git checkout origin/artifact branch-alpha/
@@ -412,7 +436,7 @@ shCiPublishPypiCustom() {(set -e
 )}
 
 shCiTestNodejs() {(set -e
-# this function will run test in nodejs
+# This function will run test in nodejs.
     # init .tmp
     mkdir -p .tmp
     # rebuild c-module
@@ -453,21 +477,15 @@ ciBuildExt({process});
     # test nodejs
     (
     rm -f *~ .test*.sqlite __data/.test*.sqlite
-    COVERAGE_EXCLUDE="--exclude=jslint.mjs"
+    COVERAGE_EXCLUDE="$COVERAGE_EXCLUDE --exclude=jslint.mjs"
     if (node --eval '
 require("assert")(require("./package.json").name !== "sqlmath");
 ' >/dev/null 2>&1)
     then
         COVERAGE_EXCLUDE="$COVERAGE_EXCLUDE --exclude=sqlmath.mjs"
     fi
-    # ugly-hack - github-action will flakily hang during test
-    if [ "$GITHUB_ACTION" ] && (timeout --version >/dev/null 2>&1)
-    then
-        timeout 120 sh jslint_ci.sh \
-            shRunWithCoverage $COVERAGE_EXCLUDE node test.mjs
-    else
-        shRunWithCoverage $COVERAGE_EXCLUDE node test.mjs
-    fi
+    NODE_TEST_OPTION="$NODE_TEST_OPTION --trace-uncaught --trace-warnings"
+    shRunWithCoverage $COVERAGE_EXCLUDE node $NODE_TEST_OPTION test.mjs
     ) &
     PID_LIST="$PID_LIST $!"
     # test python
@@ -477,14 +495,40 @@ require("assert")(require("./package.json").name !== "sqlmath");
 )}
 
 shSqlmathUpdate() {(set -e
-# this function will update files with ~/Documents/sqlmath/
+# This function will update files with ~/Documents/sqlmath/.
     . "$HOME/myci2.sh" : && shMyciUpdate
     if [ "$PWD/" = "$HOME/Documents/sqlmath/" ]
     then
+        # shRollupFetch
+        if [ ! -d .sqlite-autoconf-3440200 ]
+        then
+            for URL in \
+https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz \
+https://www.sqlite.org/2023/sqlite-autoconf-3440200.tar.gz
+            do
+                curl -L "$URL" | tar -xz
+            done
+            for DIR in \
+                sqlite-autoconf-3440200 \
+                zlib-1.3.1
+            do
+                rm -rf ".$DIR"
+                mv "$DIR" ".$DIR"
+            done
+        fi
         shRollupFetch asset_sqlmath_external_rollup.js
         shRollupFetch index.html
+        shRollupFetch sqlmath_base.h
         shRollupFetch sqlmath_external_sqlite.c
         shRollupFetch sqlmath_external_zlib.c
+        # shIndentC
+        if (uname | grep -q "MING\|MSYS")
+        then
+            shIndentC sqlmath_base.c
+            shIndentC sqlmath_custom.c
+            shIndentC sqlmath_external_sqlite.c
+            shIndentC sqlmath_external_zlib.c
+        fi
         return
     fi
     if [ -d "$HOME/Documents/sqlmath/" ]
@@ -498,6 +542,7 @@ shSqlmathUpdate() {(set -e
             sqlmath.mjs \
             sqlmath/__init__.py \
             sqlmath_base.c \
+            sqlmath_base.h \
             sqlmath_browser.mjs \
             sqlmath_external_sqlite.c \
             sqlmath_external_zlib.c \
@@ -505,6 +550,10 @@ shSqlmathUpdate() {(set -e
         do
             ln -f "$HOME/Documents/sqlmath/$FILE" "$FILE"
         done
+    fi
+    if (command -v shSqlmathUpdate2 >/dev/null)
+    then
+        shSqlmathUpdate2
     fi
     git --no-pager diff
 )}

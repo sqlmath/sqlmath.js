@@ -267,9 +267,11 @@ class TestCaseSqlmath(unittest.TestCase):
             [{None}, Exception],
             # 14. 0.str
             ["", ""],
+            ["'", "'"],
             ["0", "0"],
             ["1", "1"],
             ["2", "2"],
+            ['"', '"'],
             ["\u0000", "\u0000"],
             ["\u0000\U0001f600\u0000", "\u0000\U0001f600\u0000"],
             ["a" * 9999, "a" * 9999],
@@ -330,9 +332,9 @@ VALUES
     (?1, ?2, ?3),
     (CAST(?1 AS TEXT), CAST(?2 AS TEXT), CAST(?3 AS TEXT)),
     (
-        CAST(uncompress(compress(?1)) AS TEXT),
-        CAST(uncompress(compress(?2)) AS TEXT),
-        CAST(uncompress(compress(?3)) AS TEXT)
+        CAST(zlib_uncompress(zlib_compress(?1)) AS TEXT),
+        CAST(zlib_uncompress(zlib_compress(?2)) AS TEXT),
+        CAST(zlib_uncompress(zlib_compress(?3)) AS TEXT)
     );
 SELECT * FROM testDbExecAsync1;
 SELECT * FROM testDbExecAsync2;

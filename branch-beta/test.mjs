@@ -28,6 +28,7 @@ npm_config_mode_test_save2=1 npm test
 /*jslint beta, node*/
 import jslint from "./jslint.mjs";
 import {
+    LGBM_PREDICT_NORMAL,
     assertErrorThrownAsync,
     assertJsonEqual,
     assertNumericalEqual,
@@ -35,9 +36,10 @@ import {
     childProcessSpawn2,
     ciBuildExt,
     dbCloseAsync,
-    dbExecAndReturnFirstRow,
-    dbExecAndReturnFirstTable,
-    dbExecAndReturnLastBlobAsync,
+    dbExecAndReturnLastBlob,
+    dbExecAndReturnLastRow,
+    dbExecAndReturnLastTable,
+    dbExecAndReturnLastValue,
     dbExecAsync,
     dbFileLoadAsync,
     dbFileSaveAsync,
@@ -200,18 +202,19 @@ jstestDescribe((
                 ];
                 assertJsonEqual(bufActual, bufExpect, {
                     bufActual,
+                    bufExpect,
                     ii,
                     valExpect,
                     valIn
                 });
             }));
         }
-        async function test_dbBind_lastblob(ii, valIn, valExpect) {
+        async function test_dbBind_lastBlob(ii, valIn, valExpect) {
             let bufActual;
             let bufExpect;
             if (valExpect === Error) {
                 assertErrorThrownAsync(
-                    dbExecAndReturnLastBlobAsync.bind(undefined, {
+                    dbExecAndReturnLastBlob.bind(undefined, {
                         bindList: [valIn],
                         db,
                         sql: "SELECT 1, 2, 3; SELECT 1, 2, ?"
@@ -221,7 +224,7 @@ jstestDescribe((
                 return;
             }
             bufActual = new TextDecoder().decode(
-                await dbExecAndReturnLastBlobAsync({
+                await dbExecAndReturnLastBlob({
                     bindList: [valIn],
                     db,
                     sql: "SELECT 1, 2, 3; SELECT 1, 2, ?"
@@ -279,13 +282,39 @@ jstestDescribe((
                 valIn
             });
         }
+        async function test_dbBind_lastValue(ii, valIn, valExpect) {
+            let valActual;
+            if (valExpect === Error) {
+                assertErrorThrownAsync(
+                    dbExecAndReturnLastValue.bind(undefined, {
+                        bindList: [valIn],
+                        db,
+                        sql: "SELECT 1, 2, 3; SELECT 1, 2, ?"
+                    }),
+                    "inclusive-range|not JSON serializable"
+                );
+                return;
+            }
+            valActual = await dbExecAndReturnLastValue({
+                bindList: [valIn],
+                db,
+                sql: "SELECT 1, 2, 3; SELECT 1, 2, ?"
+            });
+            assertJsonEqual(valActual, valExpect, {
+                ii,
+                valActual,
+                valExpect,
+                valIn
+            });
+        }
         async function test_dbBind_responseType(ii, valIn, valExpect) {
             await Promise.all([
                 "arraybuffer",
                 "list",
+                "lastvalue",
                 undefined
             ].map(async function (responseType) {
-                let bufActual;
+                let valActual;
                 if (valExpect === Error) {
                     assertErrorThrownAsync(
                         dbExecAsync.bind(undefined, {
@@ -298,7 +327,7 @@ jstestDescribe((
                     );
                     return;
                 }
-                bufActual = await dbExecAsync({
+                valActual = await dbExecAsync({
                     bindList: [valIn],
                     db,
                     responseType,
@@ -306,20 +335,22 @@ jstestDescribe((
                 });
                 switch (responseType) {
                 case "arraybuffer":
-                    bufActual = JSON.parse(
-                        new TextDecoder().decode(bufActual)
+                    valActual = JSON.parse(
+                        new TextDecoder().decode(valActual)
                     )[0][1][0];
                     break;
+                case "lastvalue":
+                    break;
                 case "list":
-                    bufActual = bufActual[0][1][0];
+                    valActual = valActual[0][1][0];
                     break;
                 default:
-                    bufActual = bufActual[0][0].val;
+                    valActual = valActual[0][0].val;
                 }
-                assertJsonEqual(bufActual, valExpect, {
-                    bufActual,
+                assertJsonEqual(valActual, valExpect, {
                     ii,
                     responseType,
+                    valActual,
                     valExpect,
                     valIn
                 });
@@ -379,9 +410,11 @@ jstestDescribe((
             [{}, "{}"],
             // 6. string
             ["", ""],
+            ["'", "'"],
             ["0", "0"],
             ["1", "1"],
             ["2", "2"],
+            ["\"", "\""],
             ["\u0000", "\u0000"],
             ["\u0000\u{1f600}\u0000", "\u0000\u{1f600}\u0000"],
             ["a".repeat(9999), "a".repeat(9999)],
@@ -392,7 +425,8 @@ jstestDescribe((
         ].map(async function ([valIn, valExpect], ii) {
             await Promise.all([
                 test_dbBind_exec(ii, valIn, valExpect),
-                test_dbBind_lastblob(ii, valIn, valExpect),
+                test_dbBind_lastBlob(ii, valIn, valExpect),
+                test_dbBind_lastValue(ii, valIn, valExpect),
                 test_dbBind_responseType(ii, valIn, valExpect)
             ]);
         }));
@@ -459,9 +493,11 @@ jstestDescribe((
             [{}, Error],
             // 6. string
             ["", ""],
+            ["'", "'"],
             ["0", "0"],
             ["1", "1"],
             ["2", "2"],
+            ["\"", "\""],
             ["\u0000", ""],
             ["\u0000\u{1f600}\u0000", "\u0000\u{1f600}"],
             ["a".repeat(9999), "a".repeat(9999)],
@@ -521,45 +557,65 @@ jstestDescribe((
         let db = await dbOpenAsync({
             filename: ":memory:"
         });
-        // test dbExecAndReturnFirstRow null-case handling-behavior
+        // test dbExecAndReturnLastRow null-case handling-behavior
         assertJsonEqual(
             noop(
-                await dbExecAndReturnFirstRow({
+                await dbExecAndReturnLastRow({
                     db,
                     sql: "SELECT 0 WHERE 0"
                 })
             ),
             {}
         );
-        // test dbExecAndReturnFirstTable null-case handling-behavior
+        // test dbExecAndReturnLastTable null-case handling-behavior
         assertJsonEqual(
             noop(
-                await dbExecAndReturnFirstTable({
+                await dbExecAndReturnLastTable({
                     db,
                     sql: "SELECT 0 WHERE 0"
                 })
             ),
             []
         );
-        // test dbExecAndReturnLastBlobAsync null-case handling-behavior
+        // test dbExecAndReturnLastBlob null-case handling-behavior
         assertJsonEqual(
             new TextDecoder().decode(
-                await dbExecAndReturnLastBlobAsync({
+                await dbExecAndReturnLastBlob({
                     db,
                     sql: "SELECT 0 WHERE 0"
                 })
             ),
             ""
         );
-        // test dbExecAndReturnLastBlobAsync string handling-behavior
+        // test dbExecAndReturnLastBlob string handling-behavior
         assertJsonEqual(
             new TextDecoder().decode(
-                await dbExecAndReturnLastBlobAsync({
+                await dbExecAndReturnLastBlob({
                     db,
-                    sql: "SELECT 1234"
+                    sql: "SELECT 1, 2, 3"
                 })
             ),
-            "1234"
+            "3"
+        );
+        // test dbExecAndReturnLastValue null-case handling-behavior
+        assertJsonEqual(
+            noop(
+                await dbExecAndReturnLastValue({
+                    db,
+                    sql: "SELECT 0 WHERE 0"
+                })
+            ),
+            null
+        );
+        // test dbExecAndReturnLastValue json handling-behavior
+        assertJsonEqual(
+            noop(
+                await dbExecAndReturnLastValue({
+                    db,
+                    sql: "SELECT 1, 2, 3"
+                })
+            ),
+            3
         );
     });
     jstestIt((
@@ -605,9 +661,9 @@ VALUES
     (?1, ?2, ?3),
     (CAST(?1 AS TEXT), CAST(?2 AS TEXT), CAST(?3 AS TEXT)),
     (
-        CAST(uncompress(compress(?1)) AS TEXT),
-        CAST(uncompress(compress(?2)) AS TEXT),
-        CAST(uncompress(compress(?3)) AS TEXT)
+        CAST(zlib_uncompress(zlib_compress(?1)) AS TEXT),
+        CAST(zlib_uncompress(zlib_compress(?2)) AS TEXT),
+        CAST(zlib_uncompress(zlib_compress(?3)) AS TEXT)
     );
 SELECT * FROM testDbExecAsync1;
 SELECT * FROM testDbExecAsync2;
@@ -687,13 +743,7 @@ SELECT * FROM testDbExecAsync2;
             db,
             sql: "SELECT * FROM t01"
         });
-        assertJsonEqual(data, [
-            [
-                {
-                    c01: 1
-                }
-            ]
-        ]);
+        assertJsonEqual(data, [[{c01: 1}]]);
     });
     jstestIt((
         "test dbOpenAsync handling-behavior"
@@ -790,6 +840,354 @@ jstestDescribe((
 });
 
 jstestDescribe((
+    "test_lgbm"
+), function test_lgbm() {
+    jstestIt((
+        "test lgbm handling-behavior"
+    ), async function () {
+        let filePreb = "test_lgbm_preb.txt";
+        let fileTest = "test_lgbm_binary.test";
+        let fileTrain = "test_lgbm_binary.train";
+        let promiseList = [];
+        let sqlDataFile = (`
+UPDATE __lgbm_state
+    SET
+        data_train_handle = (
+            SELECT
+                lgbm_datasetcreatefromfile(
+                    '${fileTrain}', -- filename
+                    'max_bin=15', -- param_data
+                    NULL -- reference
+                )
+        );
+UPDATE __lgbm_state
+    SET
+        data_test_handle = (
+            SELECT
+                lgbm_datasetcreatefromfile(
+                    '${fileTest}', -- filename
+                    'max_bin=15', -- param_data
+                    data_train_handle -- reference
+                )
+        );
+        `);
+        let sqlDataTable = (`
+UPDATE __lgbm_state
+    SET
+        data_train_handle = (
+            SELECT
+                lgbm_datasetcreatefromtable(
+                    'max_bin=15', -- param_data
+                    NULL, -- reference
+                    --
+                    c_1,  c_2,  c_3,  c_4,
+                    c_5,  c_6,  c_7,  c_8,
+                    c_9,  c_10, c_11, c_12,
+                    c_13, c_14, c_15, c_16,
+                    c_17, c_18, c_19, c_20,
+                    c_21, c_22, c_23, c_24,
+                    c_25, c_26, c_27, c_28,
+                    c_29
+                )
+            FROM __lgbm_file_train
+        );
+UPDATE __lgbm_state
+    SET
+        data_test_handle = (
+            SELECT
+                lgbm_datasetcreatefromtable(
+                    'max_bin=15', -- param_data
+                    data_train_handle, -- reference
+                    --
+                    c_1,  c_2,  c_3,  c_4,
+                    c_5,  c_6,  c_7,  c_8,
+                    c_9,  c_10, c_11, c_12,
+                    c_13, c_14, c_15, c_16,
+                    c_17, c_18, c_19, c_20,
+                    c_21, c_22, c_23, c_24,
+                    c_25, c_26, c_27, c_28,
+                    c_29
+                )
+            FROM __lgbm_file_test
+        );
+        `);
+        let sqlIi = 0;
+        let sqlPredictFile = (`
+SELECT
+        lgbm_predictforfile(
+            model,                      -- model
+            ${LGBM_PREDICT_NORMAL},     -- predict_type
+            0,                          -- start_iteration
+            25,                         -- num_iteration
+            '',                         -- param_pred
+            --
+            '${fileTest}',              -- data_filename
+            0,                          -- data_has_header
+            'fileActual'                -- result_filename
+        )
+    FROM __lgbm_state;
+SELECT
+        lgbm_predictforfile(
+            model,                      -- model
+            ${LGBM_PREDICT_NORMAL},     -- predict_type
+            10,                         -- start_iteration
+            25,                         -- num_iteration
+            '',                         -- param_pred
+            --
+            '${fileTest}',              -- data_filename
+            0,                          -- data_has_header
+            'fileActual'                -- result_filename
+        )
+    FROM __lgbm_state;
+        `);
+        let sqlPredictTable = (`
+DROP TABLE IF EXISTS __lgbm_table_preb;
+CREATE TABLE __lgbm_table_preb AS
+    SELECT
+        lgbm_predictfortable(
+            (SELECT model FROM __lgbm_state),   -- model
+            ${LGBM_PREDICT_NORMAL},     -- predict_type
+            0,                          -- start_iteration
+            25,                         -- num_iteration
+            '',                         -- param_pred
+            --
+            c_2,  c_3,  c_4,
+            c_5,  c_6,  c_7,  c_8,
+            c_9,  c_10, c_11, c_12,
+            c_13, c_14, c_15, c_16,
+            c_17, c_18, c_19, c_20,
+            c_21, c_22, c_23, c_24,
+            c_25, c_26, c_27, c_28,
+            c_29
+        ) OVER (
+            ORDER BY rowid ASC
+            ROWS BETWEEN 0 PRECEDING AND 0 FOLLOWING
+        ) AS prediction
+    FROM __lgbm_file_test;
+DROP TABLE IF EXISTS __lgbm_table_preb;
+CREATE TABLE __lgbm_table_preb AS
+    SELECT
+        lgbm_predictfortable(
+            (SELECT model FROM __lgbm_state),   -- model
+            ${LGBM_PREDICT_NORMAL},     -- predict_type
+            10,                         -- start_iteration
+            25,                         -- num_iteration
+            '',                         -- param_pred
+            --
+            c_2,  c_3,  c_4,
+            c_5,  c_6,  c_7,  c_8,
+            c_9,  c_10, c_11, c_12,
+            c_13, c_14, c_15, c_16,
+            c_17, c_18, c_19, c_20,
+            c_21, c_22, c_23, c_24,
+            c_25, c_26, c_27, c_28,
+            c_29
+        ) OVER (
+            ORDER BY rowid ASC
+            ROWS BETWEEN 0 PRECEDING AND 0 FOLLOWING
+        ) AS c_1
+    FROM __lgbm_file_test;
+        `);
+        let sqlTrainData = (`
+UPDATE __lgbm_state
+    SET
+        model = lgbm_trainfromdataset(
+            'app=binary metric=auc num_leaves=31 verbose=0', -- param_train
+            50, -- num_iteration
+            10, -- eval_step
+            --
+            data_train_handle, -- train_data
+            data_test_handle -- test_data
+        );
+        `);
+        let sqlTrainFile = (`
+UPDATE __lgbm_state
+    SET
+        model = lgbm_trainfromfile(
+            'app=binary metric=auc num_leaves=31 verbose=0', -- param_train
+            50, -- num_iteration
+            10, -- eval_step
+            --
+            '${fileTrain}', -- file_train
+            'max_bin=15', -- param_data
+            '${fileTest}' -- file_test
+        );
+        `);
+        let sqlTrainTable = (`
+UPDATE __lgbm_state
+    SET
+        model = (
+            SELECT
+                lgbm_trainfromtable(
+                    -- param_train
+                    'app=binary metric=auc num_leaves=31 verbose=0',
+                    50, -- num_iteration
+                    10, -- eval_step
+                    --
+                    'max_bin=15', -- param_data
+                    NULL, -- reference
+                    --
+                    c_1,  c_2,  c_3,  c_4,
+                    c_5,  c_6,  c_7,  c_8,
+                    c_9,  c_10, c_11, c_12,
+                    c_13, c_14, c_15, c_16,
+                    c_17, c_18, c_19, c_20,
+                    c_21, c_22, c_23, c_24,
+                    c_25, c_26, c_27, c_28,
+                    c_29
+                )
+            FROM __lgbm_file_train
+        );
+        `);
+        async function testLgbm(sqlDataXxx, sqlTrainXxx, sqlPredictXxx, sqlIi) {
+            let db = await dbOpenAsync({filename: ":memory:"});
+            let fileActual = `.tmp/test_lgbm_preb_${sqlIi}.txt`;
+            await Promise.all([
+                dbTableImportAsync({
+                    db,
+                    filename: filePreb,
+                    headerMissing: true,
+                    mode: "tsv",
+                    tableName: "__lgbm_file_preb"
+                }),
+                dbTableImportAsync({
+                    db,
+                    filename: fileTest,
+                    headerMissing: true,
+                    mode: "tsv",
+                    tableName: "__lgbm_file_test"
+                }),
+                dbTableImportAsync({
+                    db,
+                    filename: fileTrain,
+                    headerMissing: true,
+                    mode: "tsv",
+                    tableName: "__lgbm_file_train"
+                })
+            ]);
+            await dbExecAsync({
+                db,
+                sql: (`
+-- lgbm - init
+CREATE TABLE __lgbm_state(
+    data_test_handle INTEGER,
+    data_test_num_data REAL,
+    data_test_num_feature REAL,
+    --
+    data_train_handle INTEGER,
+    data_train_num_data REAL,
+    data_train_num_feature REAL,
+    --
+    model BLOB
+);
+INSERT INTO __lgbm_state(rowid) SELECT 1;
+
+-- lgbm - data
+${sqlDataXxx};
+UPDATE __lgbm_state
+    SET
+        data_test_num_data = lgbm_datasetgetnumdata(data_test_handle),
+        data_test_num_feature = lgbm_datasetgetnumfeature(data_test_handle),
+        data_train_num_data = lgbm_datasetgetnumdata(data_train_handle),
+        data_train_num_feature = lgbm_datasetgetnumfeature(data_train_handle);
+
+-- lgbm - train
+${sqlTrainXxx};
+                `)
+            });
+            await dbExecAsync({
+                db,
+                sql: (`
+-- lgbm - predict
+${sqlPredictXxx.replace(/fileActual/g, fileActual)};
+
+-- lgbm - cleanup
+SELECT
+        lgbm_datasetfree(data_test_handle),
+        lgbm_datasetfree(data_train_handle)
+    FROM __lgbm_state;
+                `)
+            });
+            if (sqlPredictXxx === sqlPredictFile) {
+                dbTableImportAsync({
+                    db,
+                    filename: fileActual,
+                    headerMissing: true,
+                    mode: "tsv",
+                    tableName: "__lgbm_table_preb"
+                });
+            }
+            await dbFileSaveAsync({
+                db,
+                filename: `.tmp/test_lgbm_${sqlIi}.sqlite`
+            });
+            assertJsonEqual(
+                noop(
+                    await dbExecAndReturnLastRow({
+                        db,
+                        sql: (`
+SELECT
+        data_test_num_data,
+        data_test_num_feature,
+        data_train_num_data,
+        data_train_num_feature
+    FROM __lgbm_state;
+                        `)
+                    })
+                ),
+                {
+                    "data_test_num_data": 500,
+                    "data_test_num_feature": 28,
+                    "data_train_num_data": 7000,
+                    "data_train_num_feature": 28
+                }
+            );
+            if (sqlPredictXxx === sqlPredictFile) {
+                assertJsonEqual(
+                    await fsReadFileUnlessTest(fileActual, "force"),
+                    await fsReadFileUnlessTest(filePreb, "force")
+                );
+            }
+            assertJsonEqual(
+                noop(
+                    await dbExecAndReturnLastTable({
+                        db,
+                        sql: (`
+SELECT ROUND(c_1, 8) AS c_1 FROM __lgbm_table_preb;
+                        `)
+                    })
+                ),
+                noop(
+                    await dbExecAndReturnLastTable({
+                        db,
+                        sql: (`
+SELECT ROUND(c_1, 8) AS c_1 FROM __lgbm_file_preb;
+                        `)
+                    })
+                )
+            );
+        }
+        [
+            sqlDataFile, sqlDataTable
+        ].forEach(function (sqlDataXxx) {
+            [
+                sqlTrainData, sqlTrainFile, sqlTrainTable
+            ].forEach(function (sqlTrainXxx) {
+                [
+                    sqlPredictFile, sqlPredictTable
+                ].forEach(function (sqlPredictXxx) {
+                    sqlIi += 1;
+                    promiseList.push(
+                        testLgbm(sqlDataXxx, sqlTrainXxx, sqlPredictXxx, sqlIi)
+                    );
+                });
+            });
+        });
+        await Promise.all(promiseList);
+    });
+});
+
+jstestDescribe((
     "test_misc"
 ), function test_misc() {
     jstestIt((
@@ -835,7 +1233,7 @@ jstestDescribe((
         assertJsonEqual(
             "not an error",
             noop(
-                await dbExecAndReturnFirstRow({
+                await dbExecAndReturnLastRow({
                     db,
                     sql: `SELECT throwerror(0) AS val`
                 })
@@ -917,7 +1315,7 @@ jstestDescribe((
             let valActual;
             try {
                 valActual = noop(
-                    await dbExecAndReturnFirstRow({
+                    await dbExecAndReturnLastRow({
                         bindList: {
                             valIn
                         },
@@ -943,34 +1341,6 @@ SELECT doublearray_jsonto(doublearray_jsonfrom($valIn)) AS result;
                 valIn
             });
         }));
-    });
-    jstestIt((
-        "test sqlite-extension-fill_forward handling-behavior"
-    ), async function test_sqlite_extension_fill_forward() {
-        let db = await dbOpenAsync({filename: ":memory:"});
-        let result = await dbExecAsync({
-            db,
-            sql: (`
-SELECT
-    fill_forward(val) OVER (ORDER BY id ASC) AS val
-    FROM (
-        SELECT 10 AS id, NULL AS val
-        UNION ALL SELECT 9 AS id, 9 AS val
-        UNION ALL SELECT 8 AS id, 8 AS val
-        UNION ALL SELECT 7 AS id, NULL AS val
-        UNION ALL SELECT 6 AS id, 6 AS val
-        UNION ALL SELECT 5 AS id, 5 AS val
-        UNION ALL SELECT 4 AS id, NULL AS val
-        UNION ALL SELECT 3 AS id, 3 AS val
-        UNION ALL SELECT 2 AS id, NULL AS val
-        UNION ALL SELECT 1 AS id, NULL AS val
-    );
-            `)
-        });
-        result = result[0].map(function ({val}) {
-            return val;
-        });
-        assertJsonEqual(result, [null, null, 3, 3, 5, 6, 6, 8, 9, 9]);
     });
     jstestIt((
         "test sqlite-extension-math handling-behavior"
@@ -1168,16 +1538,12 @@ SELECT
             ]) {
                 let sql = `SELECT ${func}(${arg}) AS val`;
                 let valActual = noop(
-                    await dbExecAndReturnFirstRow({
+                    await dbExecAndReturnLastRow({
                         db,
                         sql
                     })
                 ).val;
-                assertJsonEqual(valActual, valExpect, {
-                    sql,
-                    valActual,
-                    valExpect
-                });
+                assertJsonEqual(valActual, valExpect);
             });
         });
     });
@@ -1188,7 +1554,7 @@ SELECT
             filename: ":memory:"
         });
         await (async function () {
-            let valActual = await dbExecAndReturnFirstTable({
+            let valActual = await dbExecAndReturnLastTable({
                 db,
                 sql: (`
 -- test null-case handling-behavior
@@ -1302,19 +1668,20 @@ SELECT
                 Array.from(data).reverse()
             ].map(async function (data) {
                 let valActual;
-                valActual = await dbExecAndReturnFirstRow({
+                valActual = await dbExecAndReturnLastRow({
                     bindList: {
                         tmp1: JSON.stringify(data)
                     },
                     db,
                     sql: (`
+-- test null-case handling-behavior
+SELECT quantile(value, ${kk}) AS qnt FROM JSON_EACH($tmp1) WHERE 0;
+-- test last-row handling-behavior
 SELECT
         median(value) AS mdn,
         quantile(value, ${kk}) AS qnt,
         ROUND(stdev(value), 8) AS std
     FROM JSON_EACH($tmp1);
--- test null-case handling-behavior
-SELECT quantile(value, ${kk}) AS qnt FROM JSON_EACH($tmp1) WHERE 0;
                     `)
                 });
                 assertJsonEqual(
@@ -1367,7 +1734,12 @@ SELECT
             ORDER BY value->>0 ASC
             ${sqlBetween}
         ) AS val
-    FROM JSON_EAcH($valIn);
+    FROM (
+        SELECT
+            *,
+            ROW_NUMBER() OVER(ORDER BY id ASC) AS id2
+        FROM JSON_EAcH($valIn)
+    );
                 `)
             });
             valActual = valActual[0].map(function ({val}) {
@@ -1382,7 +1754,7 @@ SELECT
                 db,
                 sql: (`
 SELECT
-        id,
+        id2,
         doublearray_jsonto(win_ema2(
             ${alpha},
             value->>1,
@@ -1394,12 +1766,17 @@ SELECT
             value->>1,
             value->>1,
             value->>1,
-            IIF(id = 1, -1, value->>1)
+            IIF(id2 = 1, -1, value->>1)
         ) OVER (
             ORDER BY value->>0 ASC
             ${sqlBetween}
         )) AS val
-    FROM JSON_EAcH($valIn);
+    FROM (
+        SELECT
+            *,
+            ROW_NUMBER() OVER(ORDER BY id ASC) AS id2
+        FROM JSON_EAcH($valIn)
+    );
                 `)
             });
             valActual = valActual[0].map(function ({val}, ii, list) {
@@ -1550,7 +1927,12 @@ SELECT
             ORDER BY value->>0 ASC
             ${sqlBetween}
         ) AS val
-    FROM JSON_EAcH($valIn);
+    FROM (
+        SELECT
+            *,
+            ROW_NUMBER() OVER(ORDER BY id ASC) AS id2
+        FROM JSON_EAcH($valIn)
+    );
                 `)
             });
             valActual = valActual[0].map(function ({val}) {
@@ -1558,14 +1940,14 @@ SELECT
             });
             assertJsonEqual(valActual, valExpect);
             // test win_quantile2-aggregate handling-behavior
-            valActual = await dbExecAsync({
+            valActual = await dbExecAndReturnLastTable({
                 bindList: {
                     valIn: JSON.stringify(valIn)
                 },
                 db,
                 sql: (`
 SELECT
-        id,
+        id2,
         doublearray_jsonto(win_quantile2(
             ${quantile}, value->>1,
             ${quantile}, value->>1,
@@ -1576,18 +1958,23 @@ SELECT
             ${quantile}, value->>1,
             ${quantile}, value->>1,
             ${quantile}, value->>1,
-            ${quantile}, IIF(id = 34, -1, value->>1)
+            ${quantile}, IIF(id2 = 1, -1, value->>1)
         ) OVER (
             ORDER BY value->>0 ASC
             ${sqlBetween}
         )) AS val
-    FROM JSON_EAcH($valIn);
+    FROM (
+        SELECT
+            *,
+            ROW_NUMBER() OVER(ORDER BY id ASC) AS id2
+        FROM JSON_EAcH($valIn)
+    );
                 `)
             });
-            valActual = valActual[0].map(function ({val}, ii) {
+            valActual = valActual.map(function ({val}, ii, list) {
                 val = JSON.parse(val).map(function (elem, jj) {
                     elem = Number(elem.toFixed(4));
-                    if (ii === 11 && jj === 9) {
+                    if (ii + (bb || 0) + 1 >= list.length && jj === 9) {
                         assertJsonEqual(elem, valExpect2, valActual);
                     } else {
                         assertJsonEqual(elem, valExpect[ii], valActual);
@@ -1599,18 +1986,18 @@ SELECT
             assertJsonEqual(valActual, valExpect);
         }
         valIn = [
-            [1, undefined],
-            [2, "1"],
-            [3, "2"],
-            [4, 3],
-            [5, 4],
-            [6, "abcd"],
-            [7, 6],
-            [8, NaN],
-            [9, 8],
-            [10, 9],
+            [12, 11],
             [11, 10],
-            [12, 11]
+            [10, 9],
+            [9, 8],
+            [8, NaN],
+            [7, 6],
+            [6, "abcd"],
+            [5, 4],
+            [4, 3],
+            [3, "2"],
+            [2, "1"],
+            [1, undefined]
         ];
         await Promise.all([
             (async function () {
@@ -1633,7 +2020,7 @@ SELECT win_quantile2(NULL, 1) FROM (SELECT 1);
                     });
                 }, "argument 'quantile'");
                 // test win_quantile1-null-case handling-behavior
-                valActual = await dbExecAsync({
+                valActual = await dbExecAndReturnLastTable({
                     db,
                     sql: (`
 DROP TABLE IF EXISTS __tmp1;
@@ -1641,12 +2028,12 @@ CREATE TEMP TABLE __tmp1 (val REAL);
 SELECT win_quantile1(1, 2) FROM __tmp1;
                     `)
                 });
-                valActual = valActual[0].map(function ({val}) {
+                valActual = valActual.map(function ({val}) {
                     return val;
                 });
                 assertJsonEqual(valActual, [null]);
                 // test win_quantile2-null-case handling-behavior
-                valActual = await dbExecAsync({
+                valActual = await dbExecAndReturnLastTable({
                     db,
                     sql: (`
 DROP TABLE IF EXISTS __tmp1;
@@ -1654,7 +2041,7 @@ CREATE TEMP TABLE __tmp1 (val REAL);
 SELECT doublearray_jsonto(win_quantile2(1, 2, 3)) FROM __tmp1;
                     `)
                 });
-                valActual = valActual[0].map(function ({val}) {
+                valActual = valActual.map(function ({val}) {
                     return val;
                 });
                 assertJsonEqual(valActual, [null]);
@@ -1807,6 +2194,8 @@ SELECT doublearray_jsonto(win_quantile2(1, 2, 3)) FROM __tmp1;
         "test sqlite-extension-win_sinefit2 handling-behavior"
     ), async function test_sqlite_extension_win_sinefit2() {
         let db = await dbOpenAsync({filename: ":memory:"});
+        let id3 = 9;
+        let id4 = 10;
         let valExpect0;
         let valIn;
         function sqlSinefitExtractLnr(wsf, ii, suffix) {
@@ -1835,8 +2224,6 @@ SELECT doublearray_jsonto(win_quantile2(1, 2, 3)) FROM __tmp1;
             valExpect2,
             valExpect3
         }) {
-            let id2 = 25;
-            let id3 = 28;
             let sqlBetween = "";
             let valActual;
             let xx2 = 2;
@@ -1846,7 +2233,7 @@ SELECT doublearray_jsonto(win_quantile2(1, 2, 3)) FROM __tmp1;
                 );
             }
             // test win_sinefit2-aggregate handling-behavior
-            valActual = await dbExecAsync({
+            valActual = await dbExecAndReturnLastTable({
                 bindList: {
                     valIn
                 },
@@ -1855,7 +2242,7 @@ SELECT doublearray_jsonto(win_quantile2(1, 2, 3)) FROM __tmp1;
 DROP TABLE IF EXISTS __sinefit_win;
 CREATE TEMP TABLE __sinefit_win AS
     SELECT
-        id,
+        id2,
         __wsf,
         sinefit_extract(__wsf, 0, 'xx1', 0) AS xx11,
         sinefit_extract(__wsf, 0, 'yy1', 0) AS yy11,
@@ -1865,7 +2252,7 @@ CREATE TEMP TABLE __sinefit_win AS
         sinefit_extract(__wsf, 9, 'yy1', 0) AS yy13
     FROM (
         SELECT
-            id,
+            id2,
             win_sinefit2(
                 1, ${xx2},
                 value->>0, value->>1,
@@ -1877,12 +2264,17 @@ CREATE TEMP TABLE __sinefit_win AS
                 value->>0, value->>1,
                 value->>0, value->>1,
                 value->>0, value->>1,
-                value->>0, IIF(id = ${id2}, -1, value->>1)
+                value->>0, IIF(id2 = ${id3}, -1, value->>1)
             ) OVER (
                 ORDER BY NULL ASC
                 ${sqlBetween}
             ) AS __wsf
-        FROM JSON_EAcH($valIn)
+        FROM (
+            SELECT
+                *,
+                ROW_NUMBER() OVER(ORDER BY id ASC) AS id2
+            FROM JSON_EAcH($valIn)
+        )
     );
 UPDATE __sinefit_win
     SET
@@ -1899,7 +2291,7 @@ UPDATE __sinefit_win
             0, 0,
             0, 0
         )
-    WHERE id = 28;
+    WHERE id2 = ${id4};
 UPDATE __sinefit_win
     SET
         __wsf = sinefit_refitlast(
@@ -1915,17 +2307,17 @@ UPDATE __sinefit_win
             xx12, yy12,
             xx13, yy13
         )
-    WHERE id = ${id3};
+    WHERE id2 = ${id4};
 SELECT
-        id,
+        id2,
         ${sqlSinefitExtractLnr("__wsf", 0, "1")},
         ${sqlSinefitExtractLnr("__wsf", 8, "2")},
         ${sqlSinefitExtractLnr("__wsf", 9, "3")}
     FROM __sinefit_win;
                 `)
             });
-            valActual = valActual[0].map(function ({
-                id,
+            valActual = valActual.map(function ({
+                id2,
                 laa1,
                 laa2,
                 laa3,
@@ -1973,55 +2365,55 @@ SELECT
                 let obj2;
                 let obj3;
                 obj1 = {
-                    id,
-                    laa: laa1,
-                    lbb: lbb1,
-                    lee: lee1,
-                    lxy: lxy1,
-                    lyy: lyy1,
-                    mee: mee1,
-                    mxe: mxe1,
-                    mxx: mxx1,
-                    myy: myy1,
-                    nnn: nnn1,
-                    rr0: rr01,
-                    rr1: rr11,
-                    xx1: xx11,
-                    yy1: yy11
+                    id2,
+                    "laa": laa1,
+                    "lbb": lbb1,
+                    "lee": lee1,
+                    "lxy": lxy1,
+                    "lyy": lyy1,
+                    "mee": mee1,
+                    "mxe": mxe1,
+                    "mxx": mxx1,
+                    "myy": myy1,
+                    "nnn": nnn1,
+                    "rr0": rr01,
+                    "rr1": rr11,
+                    "xx1": xx11,
+                    "yy1": yy11
                 };
                 obj2 = {
-                    id,
-                    laa: laa2,
-                    lbb: lbb2,
-                    lee: lee2,
-                    lxy: lxy2,
-                    lyy: lyy2,
-                    mee: mee2,
-                    mxe: mxe2,
-                    mxx: mxx2,
-                    myy: myy2,
-                    nnn: nnn2,
-                    rr0: rr02,
-                    rr1: rr12,
-                    xx1: xx12,
-                    yy1: yy12
+                    id2,
+                    "laa": laa2,
+                    "lbb": lbb2,
+                    "lee": lee2,
+                    "lxy": lxy2,
+                    "lyy": lyy2,
+                    "mee": mee2,
+                    "mxe": mxe2,
+                    "mxx": mxx2,
+                    "myy": myy2,
+                    "nnn": nnn2,
+                    "rr0": rr02,
+                    "rr1": rr12,
+                    "xx1": xx12,
+                    "yy1": yy12
                 };
                 obj3 = {
-                    id,
-                    laa: laa3,
-                    lbb: lbb3,
-                    lee: lee3,
-                    lxy: lxy3,
-                    lyy: lyy3,
-                    mee: mee3,
-                    mxe: mxe3,
-                    mxx: mxx3,
-                    myy: myy3,
-                    nnn: nnn3,
-                    rr0: rr03,
-                    rr1: rr13,
-                    xx1: xx13,
-                    yy1: yy13
+                    id2,
+                    "laa": laa3,
+                    "lbb": lbb3,
+                    "lee": lee3,
+                    "lxy": lxy3,
+                    "lyy": lyy3,
+                    "mee": mee3,
+                    "mxe": mxe3,
+                    "mxx": mxx3,
+                    "myy": myy3,
+                    "nnn": nnn3,
+                    "rr0": rr03,
+                    "rr1": rr13,
+                    "xx1": xx13,
+                    "yy1": yy13
                 };
                 switch (list.length - ii) {
                 case 1:
@@ -2042,7 +2434,7 @@ SELECT
         }
         valExpect0 = [
             {
-                "id": 1,
+                "id2": 1,
                 "laa": null,
                 "lbb": null,
                 "lee": null,
@@ -2059,7 +2451,7 @@ SELECT
                 "yy1": 0
             },
             {
-                "id": 4,
+                "id2": 2,
                 "laa": null,
                 "lbb": null,
                 "lee": null,
@@ -2076,7 +2468,7 @@ SELECT
                 "yy1": 1
             },
             {
-                "id": 7,
+                "id2": 3,
                 "laa": -4.5,
                 "lbb": 2.5,
                 "lee": 0.40824829,
@@ -2093,7 +2485,7 @@ SELECT
                 "yy1": 3
             },
             {
-                "id": 10,
+                "id2": 4,
                 "laa": -3,
                 "lbb": 1.81818182,
                 "lee": 0.47673129,
@@ -2110,7 +2502,7 @@ SELECT
                 "yy1": 4
             },
             {
-                "id": 13,
+                "id2": 5,
                 "laa": -2.29411765,
                 "lbb": 1.52941176,
                 "lee": 0.50874702,
@@ -2127,7 +2519,7 @@ SELECT
                 "yy1": 5
             },
             {
-                "id": 16,
+                "id2": 6,
                 "laa": -2.54385965,
                 "lbb": 1.63157895,
                 "lee": 0.50725727,
@@ -2144,7 +2536,7 @@ SELECT
                 "yy1": 6
             },
             {
-                "id": 19,
+                "id2": 7,
                 "laa": -2.65,
                 "lbb": 1.675,
                 "lee": 0.48550416,
@@ -2161,7 +2553,7 @@ SELECT
                 "yy1": 6
             },
             {
-                "id": 22,
+                "id2": 8,
                 "laa": -2.5,
                 "lbb": 1.625,
                 "lee": 0.46770717,
@@ -2178,7 +2570,7 @@ SELECT
                 "yy1": 7
             },
             {
-                "id": 25,
+                "id2": 9,
                 "laa": 0.75,
                 "lbb": 0.85,
                 "lee": 0.94207218,
@@ -2195,7 +2587,7 @@ SELECT
                 "yy1": 8
             },
             {
-                "id": 28,
+                "id2": 10,
                 "laa": 2.75,
                 "lbb": 0.55,
                 "lee": 0.8587782,
@@ -2238,7 +2630,7 @@ SELECT win_sinefit2(1, 2, 3) FROM (SELECT 1);
                     });
                 }, "wrong number of arguments");
                 // test win_sinefit2-null-case handling-behavior
-                valActual = await dbExecAsync({
+                valActual = await dbExecAndReturnLastTable({
                     db,
                     sql: (`
 DROP TABLE IF EXISTS __tmp1;
@@ -2246,7 +2638,7 @@ CREATE TEMP TABLE __tmp1 (val REAL);
 SELECT doublearray_jsonto(win_sinefit2(1, 2, 3, 4)) FROM __tmp1;
                     `)
                 });
-                valActual = valActual[0].map(function ({val}) {
+                valActual = valActual.map(function ({val}) {
                     return val;
                 });
                 assertJsonEqual(valActual, [null]);
@@ -2254,7 +2646,7 @@ SELECT doublearray_jsonto(win_sinefit2(1, 2, 3, 4)) FROM __tmp1;
             // test win_sinefit2-aggregate-normal handling-behavior
             (async function () {
                 let valActual;
-                valActual = await dbExecAndReturnFirstRow({
+                valActual = await dbExecAndReturnLastRow({
                     bindList: {
                         valIn
                     },
@@ -2265,7 +2657,12 @@ SELECT
     FROM (
         SELECT
             win_sinefit2(1, NULL, value->>0, value->>1) AS __wsf
-        FROM JSON_EACH($valIn)
+        FROM (
+            SELECT
+                *,
+                ROW_NUMBER() OVER(ORDER BY id ASC) AS id2
+            FROM JSON_EAcH($valIn)
+        )
     );
                     `)
                 });
@@ -2311,7 +2708,7 @@ SELECT
                     "xx1": 51,
                     "yy1": 5
                 };
-                valActual = await dbExecAndReturnFirstRow({
+                valActual = await dbExecAndReturnLastRow({
                     db,
                     sql: (`
 SELECT
@@ -2338,7 +2735,7 @@ SELECT
                 bb: 0,
                 valExpect: valExpect0,
                 valExpect2: {
-                    "id": 25,
+                    "id2": id3,
                     "laa": 5.25,
                     "lbb": -0.275,
                     "lee": 2.49624718,
@@ -2355,7 +2752,7 @@ SELECT
                     "yy1": -1
                 },
                 valExpect3: {
-                    "id": 28,
+                    "id2": id4,
                     "laa": 7.25,
                     "lbb": -0.575,
                     "lee": 1.95735791,
@@ -2646,7 +3043,7 @@ date close
                         priceClose: Number(elem[1])
                     };
                 });
-                valActual = await dbExecAndReturnFirstTable({
+                valActual = await dbExecAndReturnLastTable({
                     bindList: {
                         testDataSpx
                     },
@@ -2735,6 +3132,184 @@ SELECT
                 );
                 assertJsonEqual(valActual, valExpect);
             }())
+        ]);
+    });
+    jstestIt((
+        "test sqlite-extension-win_sumx handling-behavior"
+    ), async function test_sqlite_extension_win_sumx() {
+        let db = await dbOpenAsync({filename: ":memory:"});
+        let valIn;
+        async function test_win_sumx_aggregate({
+            aa,
+            bb,
+            valExpect,
+            valExpect2
+        }) {
+            let sqlBetween = "";
+            let valActual;
+            if (aa !== undefined) {
+                sqlBetween = (
+                    `ROWS BETWEEN ${aa - 1} PRECEDING AND ${bb} FOLLOWING`
+                );
+            }
+            // test win_sum1-aggregate handling-behavior
+            valActual = await dbExecAndReturnLastTable({
+                bindList: {
+                    valIn: JSON.stringify(valIn)
+                },
+                db,
+                sql: (`
+SELECT
+        win_sum1(value->>1) OVER (
+            ORDER BY value->>0 ASC
+            ${sqlBetween}
+        ) AS val
+    FROM JSON_EAcH($valIn);
+                `)
+            });
+            valActual = valActual.map(function ({val}) {
+                return Number(val.toFixed(4));
+            });
+            assertJsonEqual(valActual, valExpect);
+            // test win_sum2-aggregate handling-behavior
+            valActual = await dbExecAndReturnLastTable({
+                bindList: {
+                    valIn: JSON.stringify(valIn)
+                },
+                db,
+                sql: (`
+SELECT
+        id2,
+        doublearray_jsonto(win_sum2(
+            value->>1,
+            value->>1,
+            value->>1,
+            value->>1,
+            value->>1,
+            value->>1,
+            value->>1,
+            value->>1,
+            value->>1,
+            IIF(id2 = 1, -1, value->>1)
+        ) OVER (
+            ORDER BY value->>0 ASC
+            ${sqlBetween}
+        )) AS val
+    FROM (
+        SELECT
+            *,
+            ROW_NUMBER() OVER(ORDER BY id ASC) AS id2
+        FROM JSON_EAcH($valIn)
+    );
+                `)
+            });
+            valActual = valActual.map(function ({val}, ii, list) {
+                val = JSON.parse(val).map(function (elem, jj) {
+                    elem = Number(elem.toFixed(4));
+                    if (ii + (bb || 0) + 1 >= list.length && jj === 9) {
+                        assertJsonEqual(elem, valExpect2, valActual);
+                    } else {
+                        assertJsonEqual(elem, valExpect[ii], valActual);
+                    }
+                    return elem;
+                });
+                return val[0];
+            });
+            assertJsonEqual(valActual, valExpect);
+        }
+        valIn = [
+            [11, NaN],
+            [10, "10"],
+            [9, 9],
+            [8, "8"],
+            [7, 7],
+            [6, 6],
+            [5, Infinity],
+            [4, "4"],
+            [3, 3],
+            [2, 2],
+            [1, "1"],
+            [0, undefined]
+        ];
+        await Promise.all([
+            (async function () {
+                let valActual;
+                // test win_sum2-error handling-behavior
+                await assertErrorThrownAsync(function () {
+                    return dbExecAsync({
+                        db,
+                        sql: (`
+SELECT win_sum2() FROM (SELECT 1);
+                        `)
+                    });
+                }, "wrong number of arguments");
+                // test win_sum1-null-case handling-behavior
+                valActual = await dbExecAndReturnLastTable({
+                    db,
+                    sql: (`
+DROP TABLE IF EXISTS __tmp1;
+CREATE TEMP TABLE __tmp1 (val REAL);
+SELECT win_sum1(1, 2) FROM __tmp1;
+                    `)
+                });
+                valActual = valActual.map(function ({val}) {
+                    return val;
+                });
+                assertJsonEqual(valActual, [null]);
+                // test win_sum2-null-case handling-behavior
+                valActual = await dbExecAndReturnLastTable({
+                    db,
+                    sql: (`
+DROP TABLE IF EXISTS __tmp1;
+CREATE TEMP TABLE __tmp1 (val REAL);
+SELECT doublearray_jsonto(win_sum2(1, 2, 3)) FROM __tmp1;
+                    `)
+                });
+                valActual = valActual.map(function ({val}) {
+                    return val;
+                });
+                assertJsonEqual(valActual, [null]);
+            }()),
+            // test win_sum2-aggregate-normal handling-behavior
+            test_win_sumx_aggregate({
+                valExpect: [
+                    0, 1, 3, 6,
+                    10, 14, 20, 27,
+                    35, 44, 54, 64
+                ],
+                valExpect2: 53
+            }),
+            // test win_sum2-aggregate-window handling-behavior
+            test_win_sumx_aggregate({
+                aa: 1,
+                bb: 3,
+                valExpect: [
+                    6, 10, 13, 17,
+                    21, 25, 30, 34,
+                    37, 37, 37, 37
+                ],
+                valExpect2: 26
+            }),
+            test_win_sumx_aggregate({
+                aa: 3,
+                bb: 1,
+                valExpect: [
+                    1, 3, 6, 10,
+                    13, 17, 21, 25,
+                    30, 34, 37, 37
+                ],
+                valExpect2: 26
+            }),
+            test_win_sumx_aggregate({
+                aa: 4,
+                bb: 0,
+                valExpect: [
+                    0, 1, 3, 6,
+                    10, 13, 17, 21,
+                    25, 30, 34, 37
+                ],
+                valExpect2: 26
+            })
         ]);
     });
 });

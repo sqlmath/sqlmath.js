@@ -1,13 +1,39 @@
 # Changelog
 
 # Todo
-- sqlmath - Add sqlite-extension for lightgbm.
 - none
+
+# v2024.6.25
+- jslint - Remove unnecessary shell-function shCurlExe().
+- lgbm - Upgrade to lightgbm-v4.4.0.
+- jslint - Upgrade to jslint-v2024.6.1-beta.
+- lgbm - Include lib_lightgbm.xxx in npm/python package.
+- lgbm - Add sqlite-extension for lightgbm.
+- lgbm - Add sql-functions:
+    lgbm_datasetcreatefromfile()
+    lgbm_datasetcreatefrommat()
+    lgbm_datasetcreatefromtable()
+    lgbm_datasetdumptext()
+    lgbm_datasetfree()
+    lgbm_datasetgetnumdata()
+    lgbm_datasetgetnumfeature()
+    lgbm_datasetsavebinary()
+    lgbm_dlopen()
+    lgbm_predictforfile()
+    lgbm_predictfortable()
+    lgbm_trainfromdataset()
+    lgbm_trainfromtable()
+- sqlmath - Remove little-used sql-function fill_forward().
+- zlib - Update to zlib v1.3.1.
+- sqlmath - Add function dbExecAndReturnLastValue().
+- sqlmath - Replace functions:
+    dbExecAndReturnFirstRow() with dbExecAndReturnLastRow()
+    dbExecAndReturnFirstTable() with dbExecAndReturnLastTable()
 
 # v2024.5.26
 - webdemo - Replace market-indices .spx/.ndx/.dji with futures .es/.nq/.ym.
 - sqlite - Decouple c-function str99JsonAppendText() from builtin-function jsonAppendString().
-- sqlite - Update to sqlite v3.42.0.
+- sqlite - Update to sqlite v3.44.2.
 - sqlmath - Remove little-used sqlean-regexp-extension and file sqlmath_external_pcre2.c.
 - sqlmath - bugfix - Fix off-by-2 root-mean-square-deviation calculation of parameter lee in sql-function win_sinefit2().
 - sqlmath - bugfix - Fix null-case handling-behavior for function dbExecAndReturnLastBlobAsync().
